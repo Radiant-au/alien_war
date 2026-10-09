@@ -4,13 +4,13 @@ import { CLIMB_LIMIT, MOVEMENT_ALLOWANCE, PLAYER_START_FRACTIONS, PLAYER_WIDTH, 
 import { movePlayer, stepPlayerGravity } from './movement.ts'
 import { carveCrater, createPlayers, createTerrain, explosionDamage, playerSupport, surfaceAt } from './terrain.ts'
 import { createShot, MAX_SPEED, STEP_SECONDS, stepShot, sweepShot, trajectory } from './projectile.ts'
-import { cameraCenterX, createMatch, fire, resolveShot, updateMatch } from './match.ts'
+import { cameraCenterX, overviewScrollX, overviewZoom, createMatch, fire, resolveShot, updateMatch } from './match.ts'
 import { createGrassTufts, tuftSupportDestroyed } from './terrain-visuals.ts'
 
 function readyMatch() {
   const match = createMatch()
   match.phase = 'MovementAiming'
-  match.cameraX = cameraCenterX(match.players[0].x)
+  match.cameraX = overviewScrollX(match.players)
   return match
 }
 
@@ -203,5 +203,40 @@ test('fresh restart state resets terrain, health, movement, turn, shot, input, a
   assert.deepEqual(restarted.terrain, createTerrain())
   assert.equal(restarted.shot, undefined)
   assert.equal(restarted.pointerId, undefined)
-  assert.equal(restarted.cameraX, 0)
+  assert.equal(restarted.cameraX, overviewScrollX(restarted.players))
+  assert.equal(restarted.cameraZoom, overviewZoom(restarted.players))
+})
+
+test('hybrid overview keeps both wizards within the visible horizontal frame', () => {
+  const match = createMatch()
+  const left = match.cameraX
+  const right = left + VIEW_WIDTH / match.cameraZoom
+  assert.ok(match.cameraZoom > 0 && match.cameraZoom <= 1)
+  assert.ok(match.players.every(player => player.x >= left + 60 && player.x <= right - 60))
+  for (let i = 0; i < 50; i++) updateMatch(match, STEP_SECONDS)
+  assert.equal(match.phase, 'MovementAiming')
+  assert.ok(Math.abs(match.cameraX - overviewScrollX(match.players)) < 1e-6)
+})
+
+test('hybrid camera remains stationary for on-screen shots and pans when the projectile exits', () => {
+  const match = readyMatch()
+  const initialX = match.cameraX
+  match.phase = 'ProjectileFlight'
+  match.shot = { x: (match.players[0].x + match.players[1].x) / 2, y: 100, vx: 0, vy: 0, age: 0, shooter: 0 }
+  updateMatch(match, STEP_SECONDS)
+  assert.equal(match.cameraX, initialX)
+  match.shot.x = WORLD_WIDTH + 100
+  updateMatch(match, STEP_SECONDS)
+  assert.ok(match.cameraX > initialX)
+  assert.ok(match.cameraX <= WORLD_WIDTH - VIEW_WIDTH / match.cameraZoom)
+})
+
+test('hybrid camera returns to overview after impact and before next turn', () => {
+  const match = readyMatch()
+  match.cameraX = 0
+  resolveShot(match, { kind: 'miss' })
+  for (let i = 0; i < 200; i++) updateMatch(match, STEP_SECONDS)
+  assert.equal(match.phase, 'MovementAiming')
+  assert.equal(match.active, 1)
+  assert.ok(Math.abs(match.cameraX - overviewScrollX(match.players)) < 1e-6)
 })

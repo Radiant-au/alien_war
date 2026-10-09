@@ -80,7 +80,9 @@ class ArtilleryScene extends Phaser.Scene {
     this.worldGraphics = this.add.graphics()
     this.indicator = this.add.text(VIEW_WIDTH / 2, 56, '⬇', { fontFamily: 'system-ui', fontSize: '24px', color: '#ffd36b', stroke: '#111b2e', strokeThickness: 4 }).setOrigin(0.5).setScrollFactor(0).setVisible(false)
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
-    this.cameras.main.setScroll(0, 0)
+    this.cameras.main.setOrigin(0, 0)
+    this.cameras.main.setZoom(match.cameraZoom)
+    this.cameras.main.setScroll(match.cameraX, 0)
     this.keys = this.input.keyboard!.addKeys({ A: 'A', D: 'D', LEFT: 'LEFT', RIGHT: 'RIGHT' }) as typeof this.keys
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -241,7 +243,8 @@ class ArtilleryScene extends Phaser.Scene {
   private onRestart = () => {
     this.clearInputs()
     match = createMatch(Math.floor(Math.random() * 0x100000000))
-    this.cameras.main.setScroll(0, 0)
+    this.cameras.main.setZoom(match.cameraZoom)
+    this.cameras.main.setScroll(match.cameraX, 0)
     this.soilLayer.setTilePosition(-match.terrain.textureOffset.x, -match.terrain.textureOffset.y)
     this.drawnTerrainRevision = -1
     this.drawInitialGrass()
@@ -367,7 +370,7 @@ class ArtilleryScene extends Phaser.Scene {
     if (match.shot) {
       g.fillStyle(0xfff2c0, 1)
       g.fillCircle(match.shot.x, match.shot.y, 5)
-      const screenX = match.shot.x - match.cameraX
+      const screenX = (match.shot.x - match.cameraX) * match.cameraZoom
       const inCamera = screenX >= 0 && screenX <= VIEW_WIDTH
       this.indicator.setVisible(match.shot.y < 0 || !inCamera)
       this.indicator.setPosition(Math.max(20, Math.min(VIEW_WIDTH - 20, screenX)), match.shot.y < 0 ? 58 : VIEW_HEIGHT / 2)
