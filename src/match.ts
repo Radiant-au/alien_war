@@ -17,6 +17,7 @@ export interface Match {
   accumulator: number
   pointerId?: number
   cameraX: number
+  cameraZoom: number
   cameraFromX: number
   cameraToX: number
   cameraElapsed: number
@@ -25,6 +26,17 @@ export interface Match {
 
 export function cameraCenterX(playerX: number): number {
   return Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, playerX - VIEW_WIDTH / 2))
+}
+
+export function overviewZoom(players: [Player, Player]): number {
+  const separation = Math.abs(players[1].x - players[0].x)
+  return Math.min(1, VIEW_WIDTH / (separation + 240))
+}
+
+export function overviewScrollX(players: [Player, Player], zoom = overviewZoom(players)): number {
+  const midpoint = (players[0].x + players[1].x) / 2
+  const visibleWidth = VIEW_WIDTH / zoom
+  return Math.max(0, Math.min(WORLD_WIDTH - visibleWidth, midpoint - visibleWidth / 2))
 }
 
 export function createMatch(seed = 0x51a7): Match {
@@ -36,9 +48,10 @@ export function createMatch(seed = 0x51a7): Match {
     active: 0,
     phase: 'InitialCameraTransition',
     accumulator: 0,
-    cameraX: 0,
-    cameraFromX: 0,
-    cameraToX: cameraCenterX(players[0].x),
+    cameraX: overviewScrollX(players),
+    cameraZoom: overviewZoom(players),
+    cameraFromX: overviewScrollX(players),
+    cameraToX: overviewScrollX(players),
     cameraElapsed: 0,
     pendingPlayer: 0,
   }
@@ -78,14 +91,23 @@ function stepCamera(match: Match, dt: number): void {
     return
   }
 
-  let target = match.cameraX
-  if (match.phase === 'MovementAiming') target = cameraCenterX(match.players[match.active].x)
-  else if (match.phase === 'ProjectileFlight' && match.shot) target = cameraCenterX(match.shot.x)
-  else if (match.phase === 'Impact' || match.phase === 'Settling' || match.phase === 'WinnerCheck' || match.phase === 'GameOver') {
-    if (match.impactX !== undefined) target = cameraCenterX(match.impactX)
+  const zoom = match.cameraZoom
+  const overview = overviewScrollX(match.players, zoom)
+  let target = overview
+  if (match.phase === 'ProjectileFlight' && match.shot) {
+    const visibleWidth = VIEW_WIDTH / zoom
+    const margin = 90 / zoom
+    const left = match.cameraX + margin
+    const right = match.cameraX + visibleWidth - margin
+    if (match.shot.x < left) target = match.shot.x - margin
+    else if (match.shot.x > right) target = match.shot.x - visibleWidth + margin
+    else target = match.cameraX
+  } else if (match.phase === 'Impact' || match.phase === 'Settling') {
+    target = match.cameraX
   }
   match.cameraX += (target - match.cameraX) * Math.min(1, dt * 8)
-  match.cameraX = Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, match.cameraX))
+  const maxScroll = Math.max(0, WORLD_WIDTH - VIEW_WIDTH / zoom)
+  match.cameraX = Math.max(0, Math.min(maxScroll, match.cameraX))
 }
 
 export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 = 0): void {
@@ -120,7 +142,7 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
       } else {
         match.pendingPlayer = match.active === 0 ? 1 : 0
         match.cameraFromX = match.cameraX
-        match.cameraToX = cameraCenterX(match.players[match.pendingPlayer].x)
+        match.cameraToX = overviewScrollX(match.players, match.cameraZoom)
         match.cameraElapsed = 0
         match.phase = 'CameraTransition'
       }
