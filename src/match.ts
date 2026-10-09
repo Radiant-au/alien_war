@@ -27,8 +27,8 @@ export function cameraCenterX(playerX: number): number {
   return Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, playerX - VIEW_WIDTH / 2))
 }
 
-export function createMatch(): Match {
-  const terrain = createTerrain()
+export function createMatch(seed = 0x51a7): Match {
+  const terrain = createTerrain(seed)
   const players = createPlayers(terrain)
   return {
     terrain,

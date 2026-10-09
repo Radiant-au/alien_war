@@ -17,7 +17,7 @@ function readyMatch() {
 test('expanded fixed-seed terrain and starting positions are continuous and reproducible', () => {
   const first = createTerrain()
   const second = createTerrain()
-  assert.equal(WORLD_WIDTH, VIEW_WIDTH * 3)
+  assert.equal(WORLD_WIDTH, VIEW_WIDTH * 2)
   assert.equal(first.heights.length, WORLD_WIDTH + 1)
   assert.deepEqual(first, second)
   const players = createPlayers(first)

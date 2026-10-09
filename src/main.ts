@@ -240,7 +240,7 @@ class ArtilleryScene extends Phaser.Scene {
   private onFire = () => { if (fire(match)) this.clearInputs() }
   private onRestart = () => {
     this.clearInputs()
-    match = createMatch()
+    match = createMatch(Math.floor(Math.random() * 0x100000000))
     this.cameras.main.setScroll(0, 0)
     this.soilLayer.setTilePosition(-match.terrain.textureOffset.x, -match.terrain.textureOffset.y)
     this.drawnTerrainRevision = -1
@@ -301,7 +301,7 @@ class ArtilleryScene extends Phaser.Scene {
     const distance = Math.hypot(dx, dy)
     if (distance < 12) return
     // Left player fires to the right; right player fires to the left. Drag points from the player toward the target.
-    const elevation = Math.atan2(dy, Math.max(1, Math.abs(dx)))
+    const elevation = Math.max(-Math.PI / 2 + 0.05, Math.min(-0.05, Math.atan2(dy, Math.max(1, Math.abs(dx)))))
     const angle = player.id === 0 ? elevation : Math.PI - elevation
     player.aimAngle = angle
     player.power = Math.min(1, Math.max(0.15, distance / 220))
