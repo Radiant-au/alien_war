@@ -80,6 +80,7 @@ class ArtilleryScene extends Phaser.Scene {
     this.worldGraphics = this.add.graphics()
     this.indicator = this.add.text(VIEW_WIDTH / 2, 56, '⬇', { fontFamily: 'system-ui', fontSize: '24px', color: '#ffd36b', stroke: '#111b2e', strokeThickness: 4 }).setOrigin(0.5).setScrollFactor(0).setVisible(false)
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
+    this.cameras.main.setOrigin(0, 0)
     this.cameras.main.setZoom(match.cameraZoom)
     this.cameras.main.setScroll(match.cameraX, 0)
     this.keys = this.input.keyboard!.addKeys({ A: 'A', D: 'D', LEFT: 'LEFT', RIGHT: 'RIGHT' }) as typeof this.keys
