@@ -16,6 +16,7 @@ export interface Match {
   outcome?: 'Player 1 wins' | 'Player 2 wins' | 'Draw'
   accumulator: number
   pointerId?: number
+  viewWidth: number
   cameraX: number
   cameraZoom: number
   cameraFromX: number
@@ -28,14 +29,14 @@ export function cameraCenterX(playerX: number): number {
   return Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, playerX - VIEW_WIDTH / 2))
 }
 
-export function overviewZoom(players: [Player, Player]): number {
+export function overviewZoom(players: [Player, Player], viewWidth = VIEW_WIDTH): number {
   const separation = Math.abs(players[1].x - players[0].x)
-  return Math.min(1, VIEW_WIDTH / (separation + 240))
+  return Math.max(viewWidth / WORLD_WIDTH, Math.min(1, viewWidth / (separation + 240)))
 }
 
-export function overviewScrollX(players: [Player, Player], zoom = overviewZoom(players)): number {
+export function overviewScrollX(players: [Player, Player], zoom = overviewZoom(players), viewWidth = VIEW_WIDTH): number {
   const midpoint = (players[0].x + players[1].x) / 2
-  const visibleWidth = VIEW_WIDTH / zoom
+  const visibleWidth = viewWidth / zoom
   return Math.max(0, Math.min(WORLD_WIDTH - visibleWidth, midpoint - visibleWidth / 2))
 }
 
@@ -43,6 +44,7 @@ export function createMatch(seed = 0x51a7): Match {
   const terrain = createTerrain(seed)
   const players = createPlayers(terrain)
   return {
+    viewWidth: VIEW_WIDTH,
     terrain,
     players,
     active: 0,
@@ -92,10 +94,10 @@ function stepCamera(match: Match, dt: number): void {
   }
 
   const zoom = match.cameraZoom
-  const overview = overviewScrollX(match.players, zoom)
+  const overview = overviewScrollX(match.players, zoom, match.viewWidth)
   let target = overview
   if (match.phase === 'ProjectileFlight' && match.shot) {
-    const visibleWidth = VIEW_WIDTH / zoom
+    const visibleWidth = match.viewWidth / zoom
     const margin = 90 / zoom
     const left = match.cameraX + margin
     const right = match.cameraX + visibleWidth - margin
@@ -106,7 +108,7 @@ function stepCamera(match: Match, dt: number): void {
     target = match.cameraX
   }
   match.cameraX += (target - match.cameraX) * Math.min(1, dt * 8)
-  const maxScroll = Math.max(0, WORLD_WIDTH - VIEW_WIDTH / zoom)
+  const maxScroll = Math.max(0, WORLD_WIDTH - match.viewWidth / zoom)
   match.cameraX = Math.max(0, Math.min(maxScroll, match.cameraX))
 }
 
@@ -142,7 +144,7 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
       } else {
         match.pendingPlayer = match.active === 0 ? 1 : 0
         match.cameraFromX = match.cameraX
-        match.cameraToX = overviewScrollX(match.players, match.cameraZoom)
+        match.cameraToX = overviewScrollX(match.players, match.cameraZoom, match.viewWidth)
         match.cameraElapsed = 0
         match.phase = 'CameraTransition'
       }
@@ -157,3 +159,4 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
   }
   stepCamera(match, dt)
 }
+

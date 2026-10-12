@@ -1,23 +1,33 @@
 import Phaser from 'phaser'
 import './style.css'
-import soilImageUrl from '../assets/terrain.png'
+import soilImageUrl from '../assets/soil.png'
 import { EXPLOSION_RADIUS, GRASS_BASE_COLOR, GRASS_HIGHLIGHT_COLOR, GRASS_THICKNESS, GRASS_TUFT_COLOR, PLAYER_HEIGHT, PLAYER_WIDTH, SOIL_TEXTURE_SCALE, VIEW_HEIGHT, VIEW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
+import { createDecorations, decorationDestroyed, type TerrainDecoration } from './decorations.ts'
+import { viewportMetrics } from './viewport.ts'
 import { surfaceAt } from './terrain.ts'
 import { createGrassTufts, tuftSupportDestroyed, type GrassTuft } from './terrain-visuals.ts'
 import { createShot, STEP_SECONDS, stepShot, trajectory } from './projectile.ts'
-import { createMatch, fire, resolveShot, updateMatch, type Match, type Phase } from './match.ts'
+import { createMatch, fire, resolveShot, updateMatch, type Match, type Phase, overviewZoom, overviewScrollX } from './match.ts'
+
+const decorationUrls = import.meta.glob('../assets/[cp][1-6].png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+const grassImageUrl = new URL('../assets/grass.png', import.meta.url).href
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
-  <header class="hud">
-    <div class="player-card" id="player-one"><span>PLAYER 1</span><strong id="health-one">100 HP</strong></div>
-    <div class="match-info"><span id="status">Starting match</span><button id="fire" type="button">Fire</button></div>
-    <div class="player-card right" id="player-two"><span>PLAYER 2</span><strong id="health-two">100 HP</strong></div>
-    <div class="movement-controls"><button id="move-left" type="button" aria-label="Move left">◀</button><span id="allowance">Move: 120</span><button id="move-right" type="button" aria-label="Move right">▶</button></div>
-    <button id="restart" type="button" aria-label="Restart match">Restart</button>
-  </header>
   <main id="game-area" aria-label="Artillery battlefield"></main>
-  <p class="help">Move with A/D or arrows. Drag the glowing handle to aim and set power, then press Fire.</p>
+  <header class="hud">
+    <div class="player-card" id="player-one"><span class="sigil">✦</span><div><span>PLAYER 01 · AZURE</span><strong id="health-one">100 HP</strong><div class="health-track"><i id="bar-one"></i></div></div></div>
+    <div class="match-info"><span class="eyebrow">WIZARD WAR</span><span id="status" role="status">Starting match</span><span class="arena-name">THE MOONLIT WILDS</span></div>
+    <div class="player-card right" id="player-two"><span class="sigil">✧</span><div><span>PLAYER 02 · EMBER</span><strong id="health-two">100 HP</strong><div class="health-track"><i id="bar-two"></i></div></div></div>
+  </header>
+  <nav class="utility" aria-label="Match options"><button id="fullscreen" type="button">⛶ Fullscreen</button><button id="restart" type="button">↻ New match</button></nav>
+  <footer class="command-bar">
+    <div class="movement-controls"><span class="control-label">MOVE <small>A / D</small></span><div><button id="move-left" type="button" aria-label="Move left">◀</button><span id="allowance">120</span><button id="move-right" type="button" aria-label="Move right">▶</button></div></div>
+    <div class="aim-controls"><label for="angle">ANGLE <output id="angle-value">45°</output></label><input id="angle" aria-label="Aim elevation" type="range" min="3" max="87" value="45"></div>
+    <div class="aim-controls"><label for="power">POWER <output id="power-value">58%</output></label><input id="power" aria-label="Shot power" type="range" min="15" max="100" value="58"></div>
+    <button id="fire" type="button"><span>✦</span> Cast spell</button>
+  </footer>
+  <p class="help">Drag the golden orb to aim · A / D to move</p>
 `
 
 const status = document.querySelector<HTMLElement>('#status')!
@@ -30,10 +40,25 @@ const allowance = document.querySelector<HTMLElement>('#allowance')!
 const leftButton = document.querySelector<HTMLButtonElement>('#move-left')!
 const rightButton = document.querySelector<HTMLButtonElement>('#move-right')!
 const restartButton = document.querySelector<HTMLButtonElement>('#restart')!
+const angleInput = document.querySelector<HTMLInputElement>('#angle')!
+const powerInput = document.querySelector<HTMLInputElement>('#power')!
+const angleValue = document.querySelector<HTMLOutputElement>('#angle-value')!
+const powerValue = document.querySelector<HTMLOutputElement>('#power-value')!
+const healthBars = [document.querySelector<HTMLElement>('#bar-one')!, document.querySelector<HTMLElement>('#bar-two')!]
+const fullscreenButton = document.querySelector<HTMLButtonElement>('#fullscreen')!
+fullscreenButton.addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen()
+    else await app.requestFullscreen()
+  } catch { fullscreenButton.textContent = 'Fullscreen unavailable' }
+})
+document.addEventListener('fullscreenchange', () => { fullscreenButton.textContent = document.fullscreenElement ? '⛶ Exit fullscreen' : '⛶ Fullscreen' })
 let match: Match
 
 class ArtilleryScene extends Phaser.Scene {
-  private backgroundGraphics!: Phaser.GameObjects.Graphics
+  private viewScale = 1
+  private decorations: { data: TerrainDecoration; sprite: Phaser.GameObjects.Image }[] = []
+  private grassSource!: HTMLCanvasElement
   private terrainMaskGraphics!: Phaser.GameObjects.Graphics
   private terrainMask!: Phaser.Display.Masks.GeometryMask
   private soilLayer!: Phaser.GameObjects.TileSprite
@@ -54,17 +79,18 @@ class ArtilleryScene extends Phaser.Scene {
 
   preload() {
     this.load.image('soil-source', soilImageUrl)
+    this.load.image('grass-source', grassImageUrl)
+    for (const [path, url] of Object.entries(decorationUrls)) this.load.image(path.split('/').pop()!.replace('.png', ''), url)
   }
 
   create() {
-    this.backgroundGraphics = this.add.graphics()
-    this.drawBackground()
+    this.grassSource = this.trimGrass(this.textures.get('grass-source').getSourceImage() as HTMLImageElement)
     this.terrainMaskGraphics = this.make.graphics({ x: 0, y: 0 }, false)
     this.terrainMask = this.terrainMaskGraphics.createGeometryMask()
     const source = this.textures.get('soil-source').getSourceImage() as HTMLImageElement
     const soilTile = this.textures.addCanvas('soil-tile', this.makeSeamlessTile(source))
     if (!soilTile) throw new Error('Unable to create soil tile texture')
-    this.soilLayer = this.add.tileSprite(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 'soil-tile')
+    this.soilLayer = this.add.tileSprite(0, 0, WORLD_WIDTH, WORLD_HEIGHT + 2048, 'soil-tile')
       .setOrigin(0)
       .setTileScale(SOIL_TEXTURE_SCALE)
       .setTilePosition(-match.terrain.textureOffset.x, -match.terrain.textureOffset.y)
@@ -77,12 +103,12 @@ class ArtilleryScene extends Phaser.Scene {
     this.drawInitialGrass()
     this.add.image(0, 0, 'grass-surface').setOrigin(0)
     this.drawTerrainMask()
-    this.worldGraphics = this.add.graphics()
-    this.indicator = this.add.text(VIEW_WIDTH / 2, 56, '⬇', { fontFamily: 'system-ui', fontSize: '24px', color: '#ffd36b', stroke: '#111b2e', strokeThickness: 4 }).setOrigin(0.5).setScrollFactor(0).setVisible(false)
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
+    this.drawDecorations()
+    this.worldGraphics = this.add.graphics().setDepth(3)
+    this.indicator = this.add.text(VIEW_WIDTH / 2, 56, '⬇', { fontFamily: 'system-ui', fontSize: '24px', color: '#ffd36b', stroke: '#111b2e', strokeThickness: 4 }).setOrigin(0.5).setScrollFactor(0).setDepth(4).setVisible(false)
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.resizeView, this)
     this.cameras.main.setOrigin(0, 0)
-    this.cameras.main.setZoom(match.cameraZoom)
-    this.cameras.main.setScroll(match.cameraX, 0)
+    this.resizeView()
     this.keys = this.input.keyboard!.addKeys({ A: 'A', D: 'D', LEFT: 'LEFT', RIGHT: 'RIGHT' }) as typeof this.keys
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -114,6 +140,8 @@ class ArtilleryScene extends Phaser.Scene {
 
     this.bindMovementButton(leftButton, -1)
     this.bindMovementButton(rightButton, 1)
+    angleInput.addEventListener('input', this.onAimControl)
+    powerInput.addEventListener('input', this.onAimControl)
     fireButton.addEventListener('click', this.onFire)
     restartButton.addEventListener('click', this.onRestart)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this)
@@ -158,12 +186,57 @@ class ArtilleryScene extends Phaser.Scene {
     return canvas
   }
 
-  private drawBackground() {
-    const g = this.backgroundGraphics
-    g.fillStyle(0x111b2e, 1)
-    g.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
-    g.fillStyle(0x25334c, 0.4)
-    for (let i = 0; i < WORLD_WIDTH / 100; i++) g.fillCircle((i * 137) % WORLD_WIDTH, (i * 83) % 300, 1.5)
+  private resizeView = () => {
+    const metrics = viewportMetrics(this.scale.width, this.scale.height)
+    this.viewScale = metrics.scale
+    match.viewWidth = metrics.logicalWidth
+    match.cameraZoom = overviewZoom(match.players, match.viewWidth)
+    match.cameraX = overviewScrollX(match.players, match.cameraZoom, match.viewWidth)
+    match.cameraFromX = match.cameraX
+    match.cameraToX = match.cameraX
+    this.positionCamera()
+  }
+
+  private positionCamera() {
+    const zoom = match.cameraZoom * this.viewScale
+    this.cameras.main.setZoom(zoom)
+    this.cameras.main.setScroll(match.cameraX, WORLD_HEIGHT - (this.scale.height - (this.scale.width < 480 ? 210 : 90)) / zoom)
+  }
+
+  private trimGrass(source: HTMLImageElement) {
+    const canvas = document.createElement('canvas')
+    canvas.width = source.naturalWidth
+    canvas.height = source.naturalHeight
+    const context = canvas.getContext('2d')!
+    context.drawImage(source, 0, 0)
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data
+    let top = canvas.height, bottom = 0
+    for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+      if (data[(y * canvas.width + x) * 4 + 3] > 32) { top = Math.min(top, y); bottom = Math.max(bottom, y) }
+    }
+    const cropped = document.createElement('canvas')
+    cropped.width = canvas.width
+    cropped.height = Math.max(1, bottom - top + 1)
+    cropped.getContext('2d')!.drawImage(canvas, 0, top, canvas.width, cropped.height, 0, 0, cropped.width, cropped.height)
+    return cropped
+  }
+
+  private drawDecorations() {
+    for (const item of this.decorations) item.sprite.destroy()
+    this.decorations = createDecorations(match.terrain).map(data => {
+      const sprite = this.add.image(data.x, data.y, data.key).setOrigin(0.5, 1).setDepth(1)
+      sprite.setDisplaySize(data.width, data.width * sprite.height / sprite.width)
+      if (data.kind === 'crystal') sprite.setMask(this.terrainMask)
+      return { data, sprite }
+    })
+  }
+
+  private onAimControl = () => {
+    if (match.phase !== 'MovementAiming') return
+    const player = match.players[match.active]
+    const elevation = -Number(angleInput.value) * Math.PI / 180
+    player.aimAngle = player.id === 0 ? elevation : Math.PI - elevation
+    player.power = Number(powerInput.value) / 100
   }
 
   private drawTerrainMask() {
@@ -171,10 +244,10 @@ class ArtilleryScene extends Phaser.Scene {
     g.clear()
     g.fillStyle(0xffffff, 1)
     g.beginPath()
-    g.moveTo(0, WORLD_HEIGHT)
+    g.moveTo(0, WORLD_HEIGHT + 2048)
     g.lineTo(0, surfaceAt(match.terrain, 0))
     for (let x = 1; x <= WORLD_WIDTH; x++) g.lineTo(x, match.terrain.heights[x])
-    g.lineTo(WORLD_WIDTH, WORLD_HEIGHT)
+    g.lineTo(WORLD_WIDTH, WORLD_HEIGHT + 2048)
     g.closePath()
     g.fillPath()
   }
@@ -204,6 +277,13 @@ class ArtilleryScene extends Phaser.Scene {
     context.lineJoin = 'round'
     context.stroke()
 
+    // Sample narrow slices so the painted grass follows each procedural slope.
+    const stripHeight = 15
+    const stripWidth = this.grassSource.width * stripHeight / this.grassSource.height
+    for (let x = 0; x < WORLD_WIDTH; x += 2) {
+      const sx = (x % stripWidth) / stripWidth * this.grassSource.width
+      context.drawImage(this.grassSource, sx, 0, Math.min(2 * this.grassSource.height / stripHeight, this.grassSource.width - sx), this.grassSource.height, x, match.terrain.initialHeights[x] - 3, 2.5, stripHeight)
+    }
     this.grassTufts = createGrassTufts(match.terrain)
     context.strokeStyle = `#${GRASS_TUFT_COLOR.toString(16).padStart(6, '0')}`
     context.lineWidth = 1.5
@@ -229,7 +309,15 @@ class ArtilleryScene extends Phaser.Scene {
       if (!tuftSupportDestroyed(match.terrain, tuft)) continue
       context.fillRect(tuft.x - 4, tuft.y - tuft.height - 1, 8, tuft.height + 2)
     }
+    // The heightmap also removes soil above the crater arc; erase that grass too.
+    for (let px = Math.max(0, Math.floor(x - radius)); px <= Math.min(WORLD_WIDTH, Math.ceil(x + radius)); px++) {
+      if (match.terrain.heights[px] > match.terrain.initialHeights[px] + 0.5)
+        context.fillRect(px, match.terrain.initialHeights[px] - 16, 1, match.terrain.heights[px] - match.terrain.initialHeights[px] + 16)
+    }
     context.restore()
+    for (const item of this.decorations) {
+      if (decorationDestroyed(match.terrain, item.data, x, y, radius)) item.sprite.setVisible(false)
+    }
     this.grassTexture.refresh()
   }
 
@@ -243,11 +331,11 @@ class ArtilleryScene extends Phaser.Scene {
   private onRestart = () => {
     this.clearInputs()
     match = createMatch(Math.floor(Math.random() * 0x100000000))
-    this.cameras.main.setZoom(match.cameraZoom)
-    this.cameras.main.setScroll(match.cameraX, 0)
+    this.resizeView()
     this.soilLayer.setTilePosition(-match.terrain.textureOffset.x, -match.terrain.textureOffset.y)
     this.drawnTerrainRevision = -1
     this.drawInitialGrass()
+    this.drawDecorations()
     this.draw()
     this.updateHud()
   }
@@ -283,6 +371,9 @@ class ArtilleryScene extends Phaser.Scene {
     window.removeEventListener('pointercancel', this.onWindowPointerEnd)
     window.removeEventListener('blur', this.clearInputs)
     document.removeEventListener('visibilitychange', this.onVisibilityChange)
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.resizeView, this)
+    angleInput.removeEventListener('input', this.onAimControl)
+    powerInput.removeEventListener('input', this.onAimControl)
     fireButton.removeEventListener('click', this.onFire)
     restartButton.removeEventListener('click', this.onRestart)
   }
@@ -335,7 +426,7 @@ class ArtilleryScene extends Phaser.Scene {
     }
     if (match.phase !== this.lastPhase && ['CameraTransition', 'NextPlayerReady', 'ProjectileFlight', 'Impact', 'Settling', 'WinnerCheck', 'GameOver'].includes(match.phase)) this.clearInputs()
     this.lastPhase = match.phase
-    this.cameras.main.setScroll(match.cameraX, 0)
+    this.positionCamera()
     this.draw()
     this.updateHud()
   }
@@ -350,10 +441,19 @@ class ArtilleryScene extends Phaser.Scene {
     for (let i = 0; i < match.players.length; i++) {
       const player = match.players[i]
       const color = i === 0 ? 0x4ec5d4 : 0xe58c55
+      g.fillStyle(0x071425, 0.35)
+      g.fillEllipse(player.x, player.y + PLAYER_HEIGHT / 2, PLAYER_WIDTH + 8, 7)
       g.fillStyle(color, 1)
-      g.fillRoundedRect(player.x - PLAYER_WIDTH / 2, player.y - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT, 4)
-      g.lineStyle(2, 0xf8efdb, 1)
-      g.strokeRoundedRect(player.x - PLAYER_WIDTH / 2, player.y - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT, 4)
+      g.fillTriangle(player.x, player.y - 9, player.x - 15, player.y + 12, player.x + 15, player.y + 12)
+      g.fillStyle(0xffdab1, 1)
+      g.fillCircle(player.x, player.y - 7, 6)
+      g.fillStyle(i === 0 ? 0x245881 : 0x794269, 1)
+      g.fillTriangle(player.x - 11, player.y - 11, player.x + 9, player.y - 11, player.x - 3, player.y - 27)
+      g.fillEllipse(player.x, player.y - 11, 29, 6)
+      g.lineStyle(2, 0xf4d9a0, 0.9)
+      g.lineBetween(player.x + 14, player.y + 10, player.x + 17, player.y - 15)
+      g.fillStyle(i === 0 ? 0x95ffff : 0xffc685, 1)
+      g.fillCircle(player.x + 17, player.y - 17, 3)
       if (match.phase === 'MovementAiming' && match.active === i && player.grounded) {
         const handle = this.handlePosition(player)
         const dots = trajectory(createShot(player), match.terrain, match.players)
@@ -370,11 +470,13 @@ class ArtilleryScene extends Phaser.Scene {
     if (match.shot) {
       g.fillStyle(0xfff2c0, 1)
       g.fillCircle(match.shot.x, match.shot.y, 5)
-      const screenX = (match.shot.x - match.cameraX) * match.cameraZoom
-      const inCamera = screenX >= 0 && screenX <= VIEW_WIDTH
-      this.indicator.setVisible(match.shot.y < 0 || !inCamera)
-      this.indicator.setPosition(Math.max(20, Math.min(VIEW_WIDTH - 20, screenX)), match.shot.y < 0 ? 58 : VIEW_HEIGHT / 2)
-      this.indicator.setText(match.shot.y < 0 ? (match.shot.vy < 0 ? '↑' : '↓') : (screenX < 0 ? '←' : '→'))
+      const screenX = (match.shot.x - match.cameraX) * match.cameraZoom * this.viewScale
+      const screenY = (match.shot.y - this.cameras.main.scrollY) * this.cameras.main.zoom
+      const inCamera = screenX >= 0 && screenX <= this.scale.width && screenY >= 0 && screenY <= this.scale.height
+      this.indicator.setVisible(!inCamera)
+      this.indicator.setScale(1 / this.cameras.main.zoom)
+      this.indicator.setPosition(Math.max(20, Math.min(this.scale.width - 20, screenX)) / this.cameras.main.zoom, Math.max(100, Math.min(this.scale.height - 110, screenY)) / this.cameras.main.zoom)
+      this.indicator.setText(screenY < 0 ? (match.shot.vy < 0 ? '↑' : '↓') : screenY > this.scale.height ? '↓' : (screenX < 0 ? '←' : '→'))
     } else this.indicator.setVisible(false)
     if (match.explosion) {
       g.fillStyle(0xffa742, 0.28)
@@ -385,13 +487,21 @@ class ArtilleryScene extends Phaser.Scene {
   }
 
   private updateHud() {
+    const current = match.players[match.active]
+    const elevation = Math.round(Math.atan2(-Math.sin(current.aimAngle), Math.abs(Math.cos(current.aimAngle))) * 180 / Math.PI)
+    angleInput.value = String(elevation)
+    powerInput.value = String(Math.round(current.power * 100))
+    angleValue.textContent = `${elevation}°`
+    powerValue.textContent = `${Math.round(current.power * 100)}%`
+    healthBars.forEach((bar, i) => { bar.style.width = `${match.players[i].health}%` })
+    angleInput.disabled = powerInput.disabled = match.phase !== 'MovementAiming'
     oneHealth.textContent = `${match.players[0].health} HP`
     twoHealth.textContent = `${match.players[1].health} HP`
     const ready = match.phase === 'MovementAiming'
     oneCard.classList.toggle('active', match.active === 0 && ready)
     twoCard.classList.toggle('active', match.active === 1 && ready)
     status.textContent = match.outcome ?? (ready ? `Player ${match.active + 1}'s turn` : match.phase === 'GameOver' ? 'Match over' : match.phase.replace(/([A-Z])/g, ' $1').trim())
-    allowance.textContent = ready ? `Move: ${Math.ceil(match.players[match.active].movementRemaining)}` : 'Move: —'
+    allowance.textContent = ready ? `${Math.ceil(match.players[match.active].movementRemaining)}` : '—'
     fireButton.disabled = !ready || !match.players[match.active].grounded || match.players[match.active].health === 0 || match.pointerId !== undefined
     const canMove = ready && match.players[match.active].movementRemaining > 0
     leftButton.disabled = !canMove
@@ -405,8 +515,9 @@ new Phaser.Game({
   width: VIEW_WIDTH,
   height: VIEW_HEIGHT,
   parent: 'game-area',
-  backgroundColor: '#111b2e',
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  transparent: true,
+  scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 4 },
   scene: [ArtilleryScene],
 })
+
