@@ -1,6 +1,6 @@
 export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
-export const WORLD_WIDTH = VIEW_WIDTH * 2;
+export const WORLD_WIDTH = VIEW_WIDTH * 2.5;
 export const WORLD_HEIGHT = VIEW_HEIGHT;
 export const PLAYER_WIDTH = 34;
 export const PLAYER_HEIGHT = 24;
@@ -12,7 +12,7 @@ export const CLIMB_LIMIT = 12;
 export const CAMERA_TRANSITION_SECONDS = 0.35;
 export const GRAVITY = 300;
 export const MAX_LAUNCH_SPEED = 950;
-export const PLAYER_START_FRACTIONS = [0.3, 0.7] as const;
+export const PLAYER_START_FRACTIONS = [0.22, 0.78] as const;
 export const SOIL_TEXTURE_SCALE = 0.12;
 export const SOIL_TEXTURE_SIZE = 1254;
 export const GRASS_THICKNESS = 8;

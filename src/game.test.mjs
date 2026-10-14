@@ -17,7 +17,7 @@ function readyMatch() {
 test('expanded fixed-seed terrain and starting positions are continuous and reproducible', () => {
   const first = createTerrain()
   const second = createTerrain()
-  assert.equal(WORLD_WIDTH, VIEW_WIDTH * 2)
+  assert.equal(WORLD_WIDTH, VIEW_WIDTH * 2.5)
   assert.equal(first.heights.length, WORLD_WIDTH + 1)
   assert.deepEqual(first, second)
   const players = createPlayers(first)
@@ -127,14 +127,20 @@ test('swept collision catches fast shots and maximum arc has cross-field range',
   players[1].y = 200
   const shot = { x: 100, y: 200, vx: 1000, vy: 0, age: 0, shooter: 1 }
   assert.deepEqual(sweepShot(shot, terrain, players, 500, 200), { kind: 'impact', x: 279, y: 200, target: 0 })
-  const seededTerrain = createTerrain()
-  const fieldPlayers = createPlayers(seededTerrain)
-  fieldPlayers[0].aimAngle = -1.38
-  fieldPlayers[0].power = 1
-  const crossFieldShot = createShot(fieldPlayers[0])
-  let result
-  for (let i = 0; i < 1500 && !result; i++) result = stepShot(crossFieldShot, seededTerrain, fieldPlayers)
-  assert.deepEqual(result?.target, 1)
+  // Test range on unobstructed ground; generated ridges can correctly block a shot.
+  const flatTerrain = createTerrain()
+  flatTerrain.heights.fill(400)
+  const fieldPlayers = createPlayers(flatTerrain)
+  let canReachOpponent = false
+  for (let degrees = 5; degrees < 85 && !canReachOpponent; degrees += 0.25) {
+    fieldPlayers[0].aimAngle = -degrees * Math.PI / 180
+    fieldPlayers[0].power = 1
+    const shot = createShot(fieldPlayers[0])
+    let result
+    for (let i = 0; i < 1500 && !result; i++) result = stepShot(shot, flatTerrain, fieldPlayers)
+    canReachOpponent = result?.target === 1
+  }
+  assert.equal(canReachOpponent, true)
   assert.ok(MAX_SPEED > 900)
 })
 
