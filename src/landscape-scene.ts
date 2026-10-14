@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { dragAim } from './aim.ts'
 import { WORLD_WIDTH } from './config.ts'
 import { createMatch, fire, overviewScrollX, overviewZoom, resolveShot, updateMatch, type Match } from './match.ts'
 import { createShot, STEP_SECONDS, stepShot, trajectory } from './projectile.ts'
@@ -64,6 +65,14 @@ export class LandscapeScene extends Phaser.Scene {
     const player=this.match.players[this.match.active],angle=-elevation*Math.PI/180
     player.aimAngle=Math.cos(player.aimAngle)>=0?angle:Math.PI-angle;player.power=power/100
   }
+  aimAt(screenX:number,screenY:number){
+    if(this.match.phase!=='MovementAiming')return
+    const cam=this.cameras.main,point=cam.getWorldPoint(screenX,screenY)
+    const player=this.match.players[this.match.active]
+    const reach=Math.max(110,Math.min(this.scale.width,cam.height)*.36)/cam.zoom
+    const next=dragAim(point.x-player.x,point.y-player.y,reach)
+    player.aimAngle=next.angle;player.power=next.power
+  }
   flipAim(){
     if(this.match.phase==='MovementAiming'){
       const player=this.match.players[this.match.active];player.aimAngle=Math.PI-player.aimAngle
@@ -73,13 +82,13 @@ export class LandscapeScene extends Phaser.Scene {
   private releasePointer=(e:PointerEvent)=>{this.held.delete(e.pointerId)}
   private visibility=()=>{if(document.hidden)this.clearInputs()}
   private keyDown=(event:KeyboardEvent)=>{
-    if(event.target instanceof HTMLInputElement||event.target instanceof HTMLSelectElement)return
+    if(event.target instanceof HTMLElement&&event.target.closest('input,select,button'))return
     if(['KeyA','KeyD','ArrowLeft','ArrowRight'].includes(event.code)){
       event.preventDefault();this.keys.add(event.code)
     }
   }
   private keyUp=(event:KeyboardEvent)=>{this.keys.delete(event.code)}
-  private clearInputs=()=>{this.held.clear();this.keys.clear()}
+  private clearInputs=()=>{this.held.clear();this.keys.clear();this.match.pointerId=undefined}
   cast(){if(fire(this.match)){this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()}}
   restart(count=this.match.players.length){
     this.clearInputs();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
@@ -95,7 +104,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.match.cameraFromX=this.match.cameraToX=this.match.cameraX
     const zoom=this.scale.width/960*this.match.cameraZoom
     this.cameras.main.setZoom(zoom)
-    this.baseScrollY=300-height*.58/zoom
+    this.baseScrollY=300-height*.72/zoom
     this.cameras.main.setScroll(this.match.cameraX,this.baseScrollY)
   }
   private positionCamera(){
@@ -108,8 +117,8 @@ export class LandscapeScene extends Phaser.Scene {
   private generateCrystals(){
     for(const glow of this.crystalGlows){this.tweens.killTweensOf(glow);glow.destroy()}
     this.crystalGlows=[];this.crystals=[]
-    for(let i=0;i<7;i++){
-      const x=WORLD_WIDTH*(.06+i*.145),y=surfaceAt(this.match.terrain,x)+60+(i%3)*24,color=i%2?0xb45cf5:0x39daff
+    for(let i=0;i<14;i++){
+      const x=WORLD_WIDTH*(.035+i*.071),y=surfaceAt(this.match.terrain,x)+48+(i%4)*36,color=i%2?0xb45cf5:0x39daff
       this.crystals.push({x,y,color,size:12+(i%3)*3})
       const glow=this.add.image(x,y,'halo').setTint(color).setDisplaySize(120,120).setAlpha(.35).setDepth(1)
       this.crystalGlows.push(glow)
@@ -120,16 +129,32 @@ export class LandscapeScene extends Phaser.Scene {
     const ctx=this.terrainCanvas.getContext('2d')!,terrain=this.match.terrain
     ctx.clearRect(0,0,WORLD_WIDTH,2400)
     const path=()=>{ctx.beginPath();ctx.moveTo(0,2400);for(let x=0;x<=WORLD_WIDTH;x++)ctx.lineTo(x,terrain.heights[x]);ctx.lineTo(WORLD_WIDTH,2400);ctx.closePath()}
-    path();const soil=ctx.createLinearGradient(0,280,0,650);soil.addColorStop(0,'#286367');soil.addColorStop(.45,'#1b4154');soil.addColorStop(1,'#101b35');ctx.fillStyle=soil;ctx.fill()
-    ctx.save();path();ctx.clip();let seed=terrain.decorationSeed
+    path();const soil=ctx.createLinearGradient(0,100,0,850);soil.addColorStop(0,'#28b9ac');soil.addColorStop(.35,'#197ca7');soil.addColorStop(.65,'#263f8e');soil.addColorStop(1,'#111c45');ctx.fillStyle=soil;ctx.fill()
+    ctx.save();path();ctx.clip()
+    // A thin translucent surface band follows surviving ground and new craters.
+    ctx.fillStyle='#6ad7bd18'
+    for(let x=0;x<WORLD_WIDTH;x++)ctx.fillRect(x,terrain.heights[x],1,18)
+    // Depth bands are clipped by the same destructible mask as the soil.
+    for(const [depth,color] of [[38,'#087ba833'],[100,'#2448a544'],[185,'#272a7244']] as const){
+      ctx.beginPath();ctx.moveTo(0,2400)
+      for(let x=0;x<=WORLD_WIDTH;x+=12)ctx.lineTo(x,terrain.initialHeights[x]+depth+Math.sin(x*.037+depth)*10)
+      ctx.lineTo(WORLD_WIDTH,2400);ctx.closePath();ctx.fillStyle=color;ctx.fill()
+    }
+    let seed=terrain.decorationSeed
     const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
     for(let i=0;i<900;i++){
       const x=random()*WORLD_WIDTH,y=280+random()*600;ctx.fillStyle='#092c3c55';ctx.beginPath();ctx.arc(x,y,1+random()*2,0,Math.PI*2);ctx.fill()
     }
-    for(let i=0;i<48;i++){
+    // Broad geological facets add color without heavy bitmap textures.
+    for(let i=0;i<36;i++){
+      const x=random()*WORLD_WIDTH,y=terrain.initialHeights[Math.round(x)]+65+random()*240,r=32+random()*50
+      this.polygon(ctx,[[x-r,y-r*.5],[x+r*.25,y-r],[x+r,y+r*.3],[x,y+r]],['#174a7280','#263b7780','#317e981f'][i%3])
+      this.polygon(ctx,[[x-r,y-r*.5],[x+r*.25,y-r],[x,y+r]],'#081e4940')
+    }
+    for(let i=0;i<64;i++){
       const x=random()*WORLD_WIDTH,y=terrain.initialHeights[Math.round(x)]+25+random()*200,r=4+random()*12
       const points=Array.from({length:5},(_,j)=>[x+Math.cos(j*Math.PI*2/5)*r,y+Math.sin(j*Math.PI*2/5)*r*.8])
-      this.polygon(ctx,points,i%2?'#2b3d57':'#355369');this.polygon(ctx,[points[0],points[1],[x,y]],'#ffffff0b')
+      this.polygon(ctx,points,i%2?'#163256':'#205273');this.polygon(ctx,[points[0],points[1],[x,y]],'#ffffff0b')
     }
     this.crystals.forEach((item,i)=>{
       const alive=item.y-26>=surfaceAt(terrain,item.x)
@@ -142,7 +167,7 @@ export class LandscapeScene extends Phaser.Scene {
       }
     });ctx.restore()
     // Only original supported surface retains grass; crater walls expose bare earth.
-    ctx.strokeStyle='#89bc70';ctx.lineWidth=4;ctx.lineJoin='round';ctx.beginPath();let drawing=false
+    ctx.strokeStyle='#87e6ab';ctx.lineWidth=5;ctx.lineJoin='round';ctx.beginPath();let drawing=false
     for(let x=0;x<=WORLD_WIDTH;x++){
       if(terrain.heights[x]>terrain.initialHeights[x]+.5){drawing=false;continue}
       if(!drawing){ctx.moveTo(x,terrain.heights[x]);drawing=true}else ctx.lineTo(x,terrain.heights[x])
@@ -150,7 +175,7 @@ export class LandscapeScene extends Phaser.Scene {
     for(let x=22;x<WORLD_WIDTH;x+=62){
       if(terrain.heights[x]>terrain.initialHeights[x]+.5)continue
       const y=terrain.heights[x],slope=Math.atan2(surfaceAt(terrain,x+2)-surfaceAt(terrain,x-2),4)
-      ctx.save();ctx.translate(x,y);ctx.rotate(slope);ctx.strokeStyle='#78a760';ctx.lineWidth=2
+      ctx.save();ctx.translate(x,y);ctx.rotate(slope);ctx.strokeStyle='#72c998';ctx.lineWidth=2
       for(const dx of[-6,0,6]){ctx.beginPath();ctx.moveTo(dx,0);ctx.lineTo(dx*1.3,-7-(x%5));ctx.stroke()}
       if(x%186===22){
         for(let j=0;j<3;j++){
@@ -170,7 +195,7 @@ export class LandscapeScene extends Phaser.Scene {
     const editing=document.activeElement instanceof HTMLInputElement||document.activeElement instanceof HTMLSelectElement
     const left=(!editing&&(this.keys.has('KeyA')||this.keys.has('ArrowLeft')))||[...this.held.values()].includes(-1)
     const right=(!editing&&(this.keys.has('KeyD')||this.keys.has('ArrowRight')))||[...this.held.values()].includes(1)
-    const axis=left===right?0:left?-1:1
+    const axis=this.match.pointerId!==undefined||left===right?0:left?-1:1
     const beforePhase=this.match.phase
     while(this.stepAccumulator>=STEP_SECONDS){
       if(this.match.phase==='ProjectileFlight'&&this.match.shot){
@@ -186,7 +211,7 @@ export class LandscapeScene extends Phaser.Scene {
     if(this.match.phase==='MovementAiming'){
       this.match.cameraZoom=overviewZoom(this.match.players,this.match.viewWidth)
       this.cameras.main.setZoom(this.scale.width/960*this.match.cameraZoom)
-      this.baseScrollY=300-this.cameras.main.height*.58/this.cameras.main.zoom
+      this.baseScrollY=300-this.cameras.main.height*.72/this.cameras.main.zoom
     }
     this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell})
   }
@@ -222,8 +247,12 @@ export class LandscapeScene extends Phaser.Scene {
     const g=this.actors;g.clear()
     for(const p of this.match.players)this.drawAlien(p,dt)
     if(this.match.phase==='MovementAiming'){
-      g.fillStyle(SPELLS[this.selectedSpell].color,.65)
-      for(const point of trajectory(createShot(this.match.players[this.match.active]),this.match.terrain,this.match.players,1.5))g.fillCircle(point.x,point.y,2)
+      const points=trajectory(createShot(this.match.players[this.match.active]),this.match.terrain,this.match.players,.55)
+      const zoom=this.cameras.main.zoom
+      points.forEach((point,i)=>{
+        g.fillStyle(0xe8ffff,.8*(1-i/(points.length+2)))
+        g.fillCircle(point.x,point.y,Math.max(1.1,2-i*.12)/zoom)
+      })
     }
     if(this.match.shot){
       this.trail.forEach((point,i)=>{g.fillStyle(this.shotSpell.color,i/this.trail.length*.5);g.fillCircle(point.x,point.y,2+i/this.trail.length*3)})
