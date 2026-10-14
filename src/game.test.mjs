@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { CLIMB_LIMIT, MOVEMENT_ALLOWANCE, PLAYER_START_FRACTIONS, PLAYER_WIDTH, VIEW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
+import { CLIMB_LIMIT, MOVEMENT_ALLOWANCE, PLAYER_START_FRACTIONS, PLAYER_HEIGHT, PLAYER_WIDTH, VIEW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
 import { movePlayer, stepPlayerGravity } from './movement.ts'
 import { carveCrater, createPlayers, createTerrain, explosionDamage, playerSupport, surfaceAt } from './terrain.ts'
 import { createShot, MAX_SPEED, STEP_SECONDS, stepShot, sweepShot, trajectory } from './projectile.ts'
@@ -22,7 +22,7 @@ test('expanded fixed-seed terrain and starting positions are continuous and repr
   assert.deepEqual(first, second)
   const players = createPlayers(first)
   assert.deepEqual(players.map(p => p.x), PLAYER_START_FRACTIONS.map(fraction => WORLD_WIDTH * fraction))
-  assert.ok(players.every(p => Math.abs(p.y + 12 - playerSupport(first, p)) < 1e-6))
+  assert.ok(players.every(p => Math.abs(p.y + PLAYER_HEIGHT / 2 - playerSupport(first, p)) < 1e-6))
   assert.ok(first.heights.every(h => h >= 0 && h < WORLD_HEIGHT))
   assert.ok(cameraCenterX(players[1].x) <= WORLD_WIDTH - VIEW_WIDTH)
 })
@@ -76,8 +76,8 @@ test('substeps follow gentle slopes and block climbs above the configured limit 
   terrain.heights.fill(300)
   for (let x = 480; x <= 500; x++) terrain.heights[x] = 300 - (x - 480) * 0.5
   for (let x = 501; x <= 540; x++) terrain.heights[x] = 270
-  p.x = 470
-  p.y = playerSupport(terrain, p) - 12
+  p.x = 440
+  p.y = playerSupport(terrain, p) - PLAYER_HEIGHT / 2
   p.grounded = true
   p.velocityY = 0
   p.movementRemaining = MOVEMENT_ALLOWANCE
@@ -100,7 +100,7 @@ test('gravity lands actors on support without consuming movement and supports te
   p.y -= 40
   for (let i = 0; i < 120 && !p.grounded; i++) stepPlayerGravity(terrain, p, STEP_SECONDS)
   assert.equal(p.grounded, true)
-  assert.ok(Math.abs(p.y + 12 - playerSupport(terrain, p)) < 1e-6)
+  assert.ok(Math.abs(p.y + PLAYER_HEIGHT / 2 - playerSupport(terrain, p)) < 1e-6)
   assert.equal(p.movementRemaining, allowance)
   p.grounded = true
   carveCrater(terrain, p.x, p.y, 48)
@@ -125,8 +125,9 @@ test('swept collision catches fast shots and maximum arc has cross-field range',
   players[0].y = 200
   players[1].x = 400
   players[1].y = 200
+  terrain.heights.fill(400)
   const shot = { x: 100, y: 200, vx: 1000, vy: 0, age: 0, shooter: 1 }
-  assert.deepEqual(sweepShot(shot, terrain, players, 500, 200), { kind: 'impact', x: 279, y: 200, target: 0 })
+  assert.deepEqual(sweepShot(shot, terrain, players, 500, 200), { kind: 'impact', x: 300 - PLAYER_WIDTH / 2 - 4, y: 200, target: 0 })
   // Test range on unobstructed ground; generated ridges can correctly block a shot.
   const flatTerrain = createTerrain()
   flatTerrain.heights.fill(400)

@@ -25,7 +25,7 @@ export interface Terrain {
 }
 
 export interface Player {
-  id: 0 | 1;
+  id: number;
   x: number;
   y: number;
   health: number;
@@ -36,30 +36,42 @@ export interface Player {
   movementRemaining: number;
 }
 
-export function createTerrain(seed = 0x51a7): Terrain {
+export function playerStarts(count = 2): readonly number[] {
+  if (!Number.isInteger(count) || count < 2 || count > 4) throw new RangeError('Choose 2, 3 or 4 players');
+  return count === 2 ? PLAYER_START_FRACTIONS : count === 3 ? [0.09, 0.59, 0.91] : [0.09, 0.37, 0.59, 0.91];
+}
+
+export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
   let state = seed >>> 0;
   const random = () => {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
   };
-  const phase = random() * Math.PI * 2;
+  const anchors = [
+    [0, .38], [.12, .38], [.145, .48], [.175, .48], [.19, .61], [.22, .61],
+    [.27, .80], [.31, .82], [.335, .81], [.35, .72], [.425, .72], [.47, .23],
+    [.50, .23], [.53, .52], [.545, .52], [.56, .60], [.635, .60], [.65, .77],
+    [.69, .83], [.74, .81], [.79, .66], [.82, .66], [.84, .49], [.86, .49],
+    [.875, .44], [.96, .44], [.975, .49], [1, .49],
+  ];
+  const variation = random() * 10 - 5;
   const heights = Array.from({ length: WORLD_WIDTH + 1 }, (_, x) => {
     const u = x / WORLD_WIDTH;
-    // Broad hills and a central ridge encourage high-angle shots.
-    return 420 - 55 * Math.exp(-Math.pow((u - 0.15) / 0.15, 2))
-      - 50 * Math.exp(-Math.pow((u - 0.86) / 0.16, 2))
-      - 140 * Math.exp(-Math.pow((u - 0.50) / 0.075, 2))
-      + 12 * Math.sin(u * Math.PI * 6 + phase);
+    const index = Math.max(0, anchors.findIndex(anchor => anchor[0] >= u) - 1);
+    const a = anchors[index], b = anchors[Math.min(index + 1, anchors.length - 1)];
+    const t = (u - a[0]) / (b[0] - a[0]);
+    // Keep ramps angular, while the two deep basins have gently rounded floors.
+    const rounded = (u > .22 && u < .35) || (u > .635 && u < .79);
+    const blend = rounded ? t * t * (3 - 2 * t) : t;
+    return (a[1] + (b[1] - a[1]) * blend) * WORLD_HEIGHT + variation;
   });
-  for (const fraction of PLAYER_START_FRACTIONS) {
-    const center = WORLD_WIDTH * fraction;
-    const ground = heights[Math.round(center)];
-    for (
-      let x = Math.floor(center - PLAYER_WIDTH);
-      x <= center + PLAYER_WIDTH;
-      x++
-    )
-      heights[x] = ground;
+  for (const fraction of playerStarts(playerCount)) {
+    const center = Math.round(WORLD_WIDTH * fraction), ground = heights[center];
+    const radius = PLAYER_WIDTH * 2;
+    for (let x = Math.max(0, center - radius); x <= Math.min(WORLD_WIDTH, center + radius); x++) {
+      const t = Math.max(0, Math.min(1, (Math.abs(x - center) - PLAYER_WIDTH) / PLAYER_WIDTH));
+      heights[x] = ground + (heights[x] - ground) * t * t * (3 - 2 * t);
+    }
   }
   const initialHeights = [...heights];
   const tileWorldSize = SOIL_TEXTURE_SIZE * SOIL_TEXTURE_SCALE;
@@ -91,15 +103,15 @@ export function playerSupport(terrain: Terrain, player: Player): number {
   return support;
 }
 
-export function createPlayers(terrain: Terrain): [Player, Player] {
-  const positions = PLAYER_START_FRACTIONS.map((fraction) => WORLD_WIDTH * fraction);
+export function createPlayers(terrain: Terrain, count = 2): Player[] {
+  const positions = playerStarts(count).map((fraction) => WORLD_WIDTH * fraction);
   return positions.map((x, id) => {
     const player: Player = {
-      id: id as 0 | 1,
+      id,
       x,
       y: 0,
       health: 100,
-      aimAngle: id === 0 ? -Math.PI / 4 : (-Math.PI * 3) / 4,
+      aimAngle: x < WORLD_WIDTH / 2 ? -Math.PI / 4 : (-Math.PI * 3) / 4,
       power: 0.58,
       grounded: true,
       velocityY: 0,
@@ -107,7 +119,7 @@ export function createPlayers(terrain: Terrain): [Player, Player] {
     };
     player.y = playerSupport(terrain, player) - PLAYER_HEIGHT / 2;
     return player;
-  }) as [Player, Player];
+  });
 }
 
 export function carveCrater(

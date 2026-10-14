@@ -7,13 +7,13 @@ export type Phase = 'InitialCameraTransition' | 'MovementAiming' | 'ProjectileFl
 
 export interface Match {
   terrain: Terrain
-  players: [Player, Player]
-  active: 0 | 1
+  players: Player[]
+  active: number
   phase: Phase
   shot?: Shot
   explosion?: { x: number; y: number; time: number }
   impactX?: number
-  outcome?: 'Player 1 wins' | 'Player 2 wins' | 'Draw'
+  outcome?: string
   accumulator: number
   pointerId?: number
   viewWidth: number
@@ -22,27 +22,31 @@ export interface Match {
   cameraFromX: number
   cameraToX: number
   cameraElapsed: number
-  pendingPlayer: 0 | 1
+  pendingPlayer: number
 }
 
 export function cameraCenterX(playerX: number): number {
   return Math.max(0, Math.min(WORLD_WIDTH - VIEW_WIDTH, playerX - VIEW_WIDTH / 2))
 }
 
-export function overviewZoom(players: [Player, Player], viewWidth = VIEW_WIDTH): number {
-  const separation = Math.abs(players[1].x - players[0].x)
+export function overviewZoom(players: Player[], viewWidth = VIEW_WIDTH): number {
+  const alive = players.filter(p => p.health > 0)
+  const visible = alive.length ? alive : players
+  const separation = Math.max(...visible.map(p => p.x)) - Math.min(...visible.map(p => p.x))
   return Math.max(viewWidth / WORLD_WIDTH, Math.min(1, viewWidth / (separation + 240)))
 }
 
-export function overviewScrollX(players: [Player, Player], zoom = overviewZoom(players), viewWidth = VIEW_WIDTH): number {
-  const midpoint = (players[0].x + players[1].x) / 2
+export function overviewScrollX(players: Player[], zoom = overviewZoom(players), viewWidth = VIEW_WIDTH): number {
+  const alive = players.filter(p => p.health > 0)
+  const visible = alive.length ? alive : players
+  const midpoint = (Math.min(...visible.map(p => p.x)) + Math.max(...visible.map(p => p.x))) / 2
   const visibleWidth = viewWidth / zoom
   return Math.max(0, Math.min(WORLD_WIDTH - visibleWidth, midpoint - visibleWidth / 2))
 }
 
-export function createMatch(seed = 0x51a7): Match {
-  const terrain = createTerrain(seed)
-  const players = createPlayers(terrain)
+export function createMatch(seed = 0x51a7, count = 2): Match {
+  const terrain = createTerrain(seed, count)
+  const players = createPlayers(terrain, count)
   return {
     viewWidth: VIEW_WIDTH,
     terrain,
@@ -129,20 +133,19 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
       break
     case 'Settling': {
       let settled = true
-      for (const player of match.players) settled = stepPlayerGravity(match.terrain, player, dt) && settled
+      for (const player of match.players) if (player.health > 0) settled = stepPlayerGravity(match.terrain, player, dt) && settled
       if (settled) match.phase = 'WinnerCheck'
       break
     }
     case 'WinnerCheck': {
-      const [one, two] = match.players
-      if (one.health === 0 && two.health === 0) {
-        match.outcome = 'Draw'
-        match.phase = 'GameOver'
-      } else if (one.health === 0 || two.health === 0) {
-        match.outcome = one.health === 0 ? 'Player 2 wins' : 'Player 1 wins'
+      const alive = match.players.filter(player => player.health > 0)
+      if (alive.length <= 1) {
+        match.outcome = alive.length === 0 ? 'Draw' : `Player ${alive[0].id + 1} wins`
         match.phase = 'GameOver'
       } else {
-        match.pendingPlayer = match.active === 0 ? 1 : 0
+        let next = (match.active + 1) % match.players.length
+        while (match.players[next].health <= 0) next = (next + 1) % match.players.length
+        match.pendingPlayer = next
         match.cameraFromX = match.cameraX
         match.cameraToX = overviewScrollX(match.players, match.cameraZoom, match.viewWidth)
         match.cameraElapsed = 0
