@@ -13,11 +13,11 @@ export interface Shot {
   vx: number
   vy: number
   age: number
-  shooter: 0 | 1
+  shooter: number
 }
 
 export type TerminalResult =
-  | { kind: 'impact'; x: number; y: number; target: 'terrain' | 0 | 1 }
+  | { kind: 'impact'; x: number; y: number; target: 'terrain' | number }
   | { kind: 'miss' }
 
 export function createShot(player: Player): Shot {
@@ -85,13 +85,14 @@ function terrainHit(x0: number, y0: number, x1: number, y1: number, terrain: Ter
   return undefined
 }
 
-export function sweepShot(shot: Shot, terrain: Terrain, players: [Player, Player], x1: number, y1: number): TerminalResult | undefined {
+export function sweepShot(shot: Shot, terrain: Terrain, players: Player[], x1: number, y1: number): TerminalResult | undefined {
   const x0 = shot.x
   const y0 = shot.y
-  const contacts: { t: number; target: 'terrain' | 0 | 1 }[] = []
+  const contacts: { t: number; target: 'terrain' | number }[] = []
   const ground = terrainHit(x0, y0, x1, y1, terrain)
   if (ground !== undefined) contacts.push({ t: ground, target: 'terrain' })
   for (const player of players) {
+    if (player.health <= 0) continue
     const t = segmentBoxHit(x0, y0, x1, y1, player)
     if (t !== undefined) contacts.push({ t, target: player.id })
   }
@@ -101,7 +102,7 @@ export function sweepShot(shot: Shot, terrain: Terrain, players: [Player, Player
   return { kind: 'impact', x: x0 + (x1 - x0) * contact.t, y: y0 + (y1 - y0) * contact.t, target: contact.target }
 }
 
-export function stepShot(shot: Shot, terrain: Terrain, players: [Player, Player], dt = STEP_SECONDS): TerminalResult | undefined {
+export function stepShot(shot: Shot, terrain: Terrain, players: Player[], dt = STEP_SECONDS): TerminalResult | undefined {
   const stepDuration = Math.min(dt, MAX_FLIGHT_SECONDS - shot.age)
   const endX = shot.x + shot.vx * stepDuration
   const endY = shot.y + shot.vy * stepDuration + 0.5 * GRAVITY * stepDuration * stepDuration
@@ -125,7 +126,7 @@ export function stepShot(shot: Shot, terrain: Terrain, players: [Player, Player]
   return undefined
 }
 
-export function trajectory(shot: Shot, terrain: Terrain, players: [Player, Player], seconds = 0.75): { x: number; y: number }[] {
+export function trajectory(shot: Shot, terrain: Terrain, players: Player[], seconds = 0.75): { x: number; y: number }[] {
   const copy = { ...shot }
   const points: { x: number; y: number }[] = []
   const steps = Math.floor(seconds / STEP_SECONDS)

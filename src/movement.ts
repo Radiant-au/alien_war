@@ -1,16 +1,18 @@
 import { CLIMB_LIMIT, GRAVITY, MOVEMENT_ALLOWANCE, MOVEMENT_SPEED, MOVEMENT_SUBSTEP, PLAYER_GAP, PLAYER_HEIGHT, PLAYER_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
 import { playerSupport, type Player, type Terrain } from './terrain.ts'
 
-export function movePlayer(terrain: Terrain, players: [Player, Player], player: Player, axis: -1 | 0 | 1, dt: number): number {
-  if (!axis || player.movementRemaining <= 0) return 0
+export function movePlayer(terrain: Terrain, players: Player[], player: Player, axis: -1 | 0 | 1, dt: number): number {
+  if (!axis || player.health <= 0 || player.movementRemaining <= 0) return 0
   let distanceLeft = Math.min(MOVEMENT_SPEED * dt, player.movementRemaining)
   let travelled = 0
   while (distanceLeft > 1e-6) {
     const step = Math.min(MOVEMENT_SUBSTEP, distanceLeft) * axis
-    const other = players[player.id === 0 ? 1 : 0]
-    const separation = PLAYER_WIDTH + PLAYER_GAP
-    const minX = player.id === 0 ? PLAYER_WIDTH / 2 : other.x + separation
-    const maxX = player.id === 0 ? other.x - separation : WORLD_WIDTH - PLAYER_WIDTH / 2
+    const separation = PLAYER_WIDTH + PLAYER_GAP;
+    const others = players.filter(other => other.id !== player.id && other.health > 0);
+    const left = others.filter(other => other.x < player.x);
+    const right = others.filter(other => other.x > player.x);
+    const minX = Math.max(PLAYER_WIDTH / 2, ...left.map(other => other.x + separation));
+    const maxX = Math.min(WORLD_WIDTH - PLAYER_WIDTH / 2, ...right.map(other => other.x - separation));
     const nextX = Math.max(minX, Math.min(maxX, player.x + step))
     const actual = nextX - player.x
     if (Math.abs(actual) < 1e-6) break

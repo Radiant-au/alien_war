@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import './style.css'
 import { backgroundMarkup } from './background.ts'
 import { SPELLS } from './spells.ts'
+import { SHIPS, shipPortrait } from './ships.ts'
+import { MOVEMENT_ALLOWANCE } from './config.ts'
 import { LandscapeScene } from './landscape-scene.ts'
 
 const icons = [
@@ -12,21 +14,23 @@ const icons = [
 ]
 const spells = SPELLS.map(spell => spell.name)
 const app = document.querySelector<HTMLDivElement>('#app')!
-app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Wizard artillery battlefield"></main>
-<header class="hud"><div class="health-card azure"><span class="portrait">✦</span><div><span class="player-name">AZURE</span><div class="health-track"><i id="health-one-bar"></i></div><strong id="health-one">100 / 100</strong></div></div><div class="brand"><h1><span>Wizard</span> War</h1><p id="turn-status" role="status">Preparing arena</p></div><div class="health-card ember"><div><span class="player-name">EMBER</span><div class="health-track"><i id="health-two-bar"></i></div><strong id="health-two">100 / 100</strong></div><span class="portrait">✦</span></div></header>
-<nav class="utilities" aria-label="Match options"><button id="restart">↻ New match</button><button id="fullscreen">⛶</button></nav>
-<footer class="command-bar" aria-label="Spell controls">
-  <div class="movement-controls"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div>
-  <div class="spell-controls" role="group" aria-label="Choose spell">${spells.map((s,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><svg viewBox="0 0 48 48" aria-hidden="true">${icons[i]}</svg></span><span>${s}</span></button>`).join('')}</div>
+app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien artillery battlefield"></main>
+<header class="hud" data-count="4">
+${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="portrait">${shipPortrait(i)}</span><div><span class="player-name">P${i+1} · ${ship.name.toUpperCase()}</span><div class="health-track"><i id="health-${i}-bar"></i></div><strong id="health-${i}">100 / 100</strong></div></div>`).join('')}
+<div class="brand"><h1><span>Crater</span><br><b>Clash</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
+<nav class="utilities" aria-label="Match options"><label for="player-count">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
+<footer class="command-bar" aria-label="Weapon controls">
+  <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
+  <div class="spell-controls" role="group" aria-label="Choose weapon">${spells.map((s,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><svg viewBox="0 0 48 48" aria-hidden="true">${icons[i]}</svg></span><span>${s}</span></button>`).join('')}</div>
   ${dial('angle','ANGLE',45,3,87,'°')}${dial('power','POWER',70,15,100,'%')}
-  <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m10 40 23-23M30 6v6m12 7h-6M18 11l4 4m15 16-4-4" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="m30 14 2 7 7 2-7 2-2 7-2-7-7-2 7-2Z" fill="currentColor"/></svg>FIRE</button>
+  <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
 </footer><p class="help">A / D to move · Drag the dials to aim · Space to cast</p>`
 
 function dial(id:string,label:string,value:number,min:number,max:number,unit:string) {
-  return `<div class="dial-control"><div class="dial" id="${id}-dial" style="--progress:${(value-min)/(max-min)*270}deg;--rotation:${-135+(value-min)/(max-min)*270}deg"><span class="needle"></span><output id="${id}-value">${value}${unit}</output><input id="${id}" type="range" min="${min}" max="${max}" value="${value}" aria-label="${label.toLowerCase()}"></div><label for="${id}">${label}</label></div>`
+  return `<div class="dial-control"><div class="dial" id="${id}-dial" style="--progress:${(value-min)/(max-min)*270}deg;--rotation:${-135+(value-min)/(max-min)*270}deg"><span class="needle"></span><output id="${id}-value">${value}${unit}</output><input id="${id}" type="range" min="${min}" max="${max}" value="${value}" aria-label="${label.toLowerCase()}"></div><label for="${id}">${label}</label>${id==='angle'?'<button id="aim-direction" type="button" aria-label="Switch aiming direction">Aim →</button>':''}</div>`
 }
 
-const scene = new LandscapeScene()
+export const scene = new LandscapeScene()
 new Phaser.Game({ type: Phaser.CANVAS, parent:'game-area', transparent:true, scale:{mode:Phaser.Scale.RESIZE,width:window.innerWidth,height:window.innerHeight},scene:[scene] })
 for (const button of document.querySelectorAll<HTMLButtonElement>('.spell')) {
   button.addEventListener('click',()=>scene.selectSpell(Number(button.dataset.spell)))
@@ -61,6 +65,8 @@ for (const id of ['angle','power']) {
 }
 document.querySelector('#fire')!.addEventListener('click',()=>scene.cast())
 document.querySelector('#restart')!.addEventListener('click',()=>scene.restart())
+document.querySelector('#aim-direction')!.addEventListener('click',()=>scene.flipAim())
+document.querySelector('#player-count')!.addEventListener('change',e=>scene.restart(Number((e.target as HTMLSelectElement).value)))
 document.querySelector('#fullscreen')!.addEventListener('click',async()=>{
   try{if(document.fullscreenElement)await document.exitFullscreen();else await app.requestFullscreen()}catch{document.querySelector('#turn-status')!.textContent='Fullscreen unavailable'}
 })
@@ -68,7 +74,7 @@ for(const [id,axis]of [['move-left',-1],['move-right',1]]as const){
   const button=document.querySelector<HTMLButtonElement>(`#${id}`)!
   button.addEventListener('pointerdown',e=>{if(button.disabled)return;e.preventDefault();button.setPointerCapture(e.pointerId);scene.hold(e.pointerId,axis)})
 }
-window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();scene.cast()}})
+window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)&&!(e.target instanceof HTMLSelectElement)){e.preventDefault();scene.cast()}})
 scene.setHud(({match,spell})=>{
   const ready=match.phase==='MovementAiming',player=match.players[match.active]
   const elevation=Math.round(Math.atan2(-Math.sin(player.aimAngle),Math.abs(Math.cos(player.aimAngle)))*180/Math.PI)
@@ -77,13 +83,25 @@ scene.setHud(({match,spell})=>{
     document.querySelector(`#${id}-dial`)!.classList.toggle('disabled',!ready)
   }
   document.querySelectorAll<HTMLButtonElement>('.spell').forEach((button,i)=>{button.disabled=!ready;button.classList.toggle('selected',i===spell);button.setAttribute('aria-pressed',String(i===spell))})
-  match.players.forEach((p,i)=>{
-    const name=i===0?'one':'two'
-    document.querySelector(`#health-${name}`)!.textContent=`${p.health} / 100`
-    document.querySelector<HTMLElement>(`#health-${name}-bar`)!.style.width=`${p.health}%`
-    document.querySelectorAll('.health-card')[i].classList.toggle('active',match.active===i&&ready)
+  document.querySelector<HTMLElement>('.hud')!.dataset.count=String(match.players.length)
+  document.querySelectorAll<HTMLElement>('.health-card').forEach((card,i)=>{
+    const p=match.players[i];card.hidden=!p
+    if(!p)return
+    document.querySelector(`#health-${i}`)!.textContent=p.health>0?`${p.health} / 100`:'ELIMINATED'
+    document.querySelector<HTMLElement>(`#health-${i}-bar`)!.style.width=`${p.health}%`
+    card.classList.toggle('active',match.active===i&&ready);card.classList.toggle('eliminated',p.health<=0)
   })
-  document.querySelector('#turn-status')!.textContent=match.outcome??(ready?`${match.active===0?'Azure':'Ember'}'s turn · ${Math.ceil(player.movementRemaining)} movement` : match.phase==='ProjectileFlight'?'Spell in flight':match.phase==='Settling'?'Ground settling':'Preparing next turn')
+  const fuel=Math.max(0,Math.min(100,player.movementRemaining/MOVEMENT_ALLOWANCE*100))
+  document.querySelector('#fuel-value')!.textContent=`${Math.round(fuel)}%`
+  document.querySelector<HTMLElement>('#fuel-fill')!.style.width=`${fuel}%`
+  document.querySelector('#fuel-meter')!.setAttribute('aria-valuenow',String(Math.round(fuel)))
+  document.querySelector<HTMLElement>('.movement-controls')!.style.setProperty('--fuel-color','#'+SHIPS[player.id].color.toString(16))
+  const facingRight=Math.cos(player.aimAngle)>=0
+  document.querySelector<HTMLButtonElement>('#aim-direction')!.disabled=!ready
+  document.querySelector('#aim-direction')!.textContent=facingRight?'Aim →':'Aim ←'
+  const winner=match.outcome?.match(/^Player (\d+) wins$/)
+  const result=winner?`${SHIPS[Number(winner[1])-1].name} wins!`:match.outcome
+  document.querySelector('#turn-status')!.textContent=result??(ready?`P${player.id+1} · ${SHIPS[player.id].name}'s turn` : match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
   document.querySelector<HTMLButtonElement>('#fire')!.disabled=!ready||!player.grounded||player.health===0
   for(const id of ['move-left','move-right'])document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled=!ready||player.movementRemaining<=0
 })
