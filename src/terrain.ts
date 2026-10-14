@@ -42,18 +42,14 @@ export function createTerrain(seed = 0x51a7): Terrain {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
   };
-  const interval = 80;
-  const anchors = Array.from(
-    { length: WORLD_WIDTH / interval + 1 },
-    (_, i) => 345 + random() * 100 + Math.sin(i * 0.8) * 22,
-  );
+  const phase = random() * Math.PI * 2;
   const heights = Array.from({ length: WORLD_WIDTH + 1 }, (_, x) => {
-    const segment = Math.min(anchors.length - 2, Math.floor(x / interval));
-    const t = (x - segment * interval) / interval;
-    const smooth = t * t * (3 - 2 * t);
-    return (
-      anchors[segment] + (anchors[segment + 1] - anchors[segment]) * smooth
-    );
+    const u = x / WORLD_WIDTH;
+    // Broad hills and a central ridge encourage high-angle shots.
+    return 420 - 55 * Math.exp(-Math.pow((u - 0.15) / 0.15, 2))
+      - 50 * Math.exp(-Math.pow((u - 0.86) / 0.16, 2))
+      - 140 * Math.exp(-Math.pow((u - 0.50) / 0.075, 2))
+      + 12 * Math.sin(u * Math.PI * 6 + phase);
   });
   for (const fraction of PLAYER_START_FRACTIONS) {
     const center = WORLD_WIDTH * fraction;
@@ -138,6 +134,7 @@ export function explosionDamage(
   cx: number,
   cy: number,
   radius: number,
+  maximumDamage = 60,
 ): number {
   const left = player.x - PLAYER_WIDTH / 2;
   const right = player.x + PLAYER_WIDTH / 2;
@@ -145,5 +142,5 @@ export function explosionDamage(
   const bottom = player.y + PLAYER_HEIGHT / 2;
   const dx = Math.max(left - cx, 0, cx - right);
   const dy = Math.max(top - cy, 0, cy - bottom);
-  return Math.round(60 * Math.max(0, 1 - Math.hypot(dx, dy) / radius));
+  return Math.round(maximumDamage * Math.max(0, 1 - Math.hypot(dx, dy) / radius));
 }
