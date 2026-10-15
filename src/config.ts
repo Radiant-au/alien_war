@@ -1,6 +1,6 @@
 export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
-export const WORLD_WIDTH = VIEW_WIDTH * 2.5;
+export const WORLD_WIDTH = VIEW_WIDTH * 3.5;
 export const WORLD_HEIGHT = VIEW_HEIGHT;
 export const PLAYER_WIDTH = 84;
 export const PLAYER_HEIGHT = 44;

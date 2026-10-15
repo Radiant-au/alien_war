@@ -22,30 +22,37 @@ ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship
 <footer class="command-bar" aria-label="Weapon controls">
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
   <div class="spell-controls" role="group" aria-label="Choose weapon">${spells.map((s,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><svg viewBox="0 0 48 48" aria-hidden="true">${icons[i]}</svg></span><span>${s}</span></button>`).join('')}</div>
-  <button id="aim-pad" aria-label="Adjust aim: up or down for elevation, left or right for strength, X to reverse" title="Drag on the battlefield to aim. Keyboard: ↑ ↓ elevation, ← → strength, X reverse."><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 2v8m0 12v8M2 16h8m12 0h8" stroke="currentColor" stroke-width="1.5"/></svg><span>DRAG TO AIM</span></button>
+  <button id="aim-wheel" aria-label="Drag aim wheel: farther increases power; direction changes angle. Arrow keys adjust; X reverses." title="Drag the wheel: direction = angle, distance = power. ↑ ↓ angle, ← → power, X reverse."><span class="wheel-disc"><span class="wheel-face"><span class="wheel-needle"></span><span class="wheel-knob"></span><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="1"/><path d="M24 8v8m0 16v8M8 24h8m16 0h8" stroke="currentColor" stroke-width="1.5"/></svg></span></span><span class="wheel-caption">DRAG AIM</span></button>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
-</footer><p class="help">Drag from your ship to aim · A / D to move · Space to fire</p>`
+</footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div><p class="help">Drag the bottom wheel · Farther = more power · A / D to move · Space to fire</p>`
 
 export const scene = new LandscapeScene()
 new Phaser.Game({ type: Phaser.CANVAS, parent:'game-area', transparent:true, scale:{mode:Phaser.Scale.RESIZE,width:window.innerWidth,height:window.innerHeight},scene:[scene] })
 for (const button of document.querySelectorAll<HTMLButtonElement>('.spell')) {
   button.addEventListener('click',()=>scene.selectSpell(Number(button.dataset.spell)))
 }
-const battlefield=document.querySelector<HTMLElement>('#game-area')!
+const aimWheel=document.querySelector<HTMLButtonElement>('#aim-wheel')!
 let aimPointer:number|undefined
-const endAim=(e:PointerEvent)=>{
-  if(e.pointerId!==aimPointer)return
-  aimPointer=undefined;scene.match.pointerId=undefined
+const resetWheel=()=>{
+  const pointer=aimPointer;aimPointer=undefined;scene.endAim()
+  aimWheel.classList.remove('dragging')
+  if(pointer!==undefined&&aimWheel.hasPointerCapture(pointer))aimWheel.releasePointerCapture(pointer)
 }
-battlefield.addEventListener('pointerdown',e=>{
-  if(scene.match.phase!=='MovementAiming'||aimPointer!==undefined||e.button!==0||!e.isPrimary)return
-  e.preventDefault();aimPointer=e.pointerId;scene.match.pointerId=e.pointerId
-  battlefield.setPointerCapture(e.pointerId);scene.aimAt(e.clientX,e.clientY)
+const endAim=(e:PointerEvent)=>{if(e.pointerId===aimPointer)resetWheel()}
+const updateWheel=(e:PointerEvent)=>{
+  const r=aimWheel.querySelector('.wheel-disc')!.getBoundingClientRect()
+  scene.dragWheel(e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2,Math.max(72,r.width*1.6))
+}
+aimWheel.addEventListener('pointerdown',e=>{
+  if(aimPointer!==undefined||e.button!==0||!e.isPrimary||!scene.beginAim(e.pointerId))return
+  e.preventDefault();aimPointer=e.pointerId;aimWheel.setPointerCapture(e.pointerId)
+  aimWheel.classList.add('dragging');updateWheel(e)
 })
-battlefield.addEventListener('pointermove',e=>{if(e.pointerId===aimPointer)scene.aimAt(e.clientX,e.clientY)})
-for(const type of ['pointerup','pointercancel','lostpointercapture'])battlefield.addEventListener(type,endAim as EventListener)
-window.addEventListener('blur',()=>{aimPointer=undefined;scene.match.pointerId=undefined})
-document.querySelector('#aim-pad')!.addEventListener('keydown',event=>{
+aimWheel.addEventListener('pointermove',e=>{if(e.pointerId===aimPointer)updateWheel(e)})
+for(const type of ['pointerup','pointercancel','lostpointercapture'])aimWheel.addEventListener(type,endAim as EventListener)
+window.addEventListener('blur',resetWheel)
+document.addEventListener('visibilitychange',()=>{if(document.hidden)resetWheel()})
+document.querySelector('#aim-wheel')!.addEventListener('keydown',event=>{
   const e=event as KeyboardEvent
   if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyX'].includes(e.code))return
   e.preventDefault();e.stopPropagation()
@@ -55,8 +62,8 @@ document.querySelector('#aim-pad')!.addEventListener('keydown',event=>{
   scene.aim(Math.max(3,Math.min(87,elevation+(e.code==='ArrowUp'?2:e.code==='ArrowDown'?-2:0))),Math.max(15,Math.min(100,player.power*100+(e.code==='ArrowRight'?3:e.code==='ArrowLeft'?-3:0))))
 })
 document.querySelector('#fire')!.addEventListener('click',()=>scene.cast())
-document.querySelector('#restart')!.addEventListener('click',()=>scene.restart())
-document.querySelector('#player-count')!.addEventListener('change',e=>scene.restart(Number((e.target as HTMLSelectElement).value)))
+document.querySelector('#restart')!.addEventListener('click',()=>{resetWheel();scene.restart()})
+document.querySelector('#player-count')!.addEventListener('change',e=>{resetWheel();scene.restart(Number((e.target as HTMLSelectElement).value))})
 document.querySelector('#fullscreen')!.addEventListener('click',async()=>{
   try{if(document.fullscreenElement)await document.exitFullscreen();else await app.requestFullscreen()}catch{document.querySelector('#turn-status')!.textContent='Fullscreen unavailable'}
 })
@@ -65,9 +72,23 @@ for(const [id,axis]of [['move-left',-1],['move-right',1]]as const){
   button.addEventListener('pointerdown',e=>{if(button.disabled)return;e.preventDefault();button.setPointerCapture(e.pointerId);scene.hold(e.pointerId,axis)})
 }
 window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)&&!(e.target instanceof HTMLSelectElement)){e.preventDefault();scene.cast()}})
-scene.setHud(({match,spell})=>{
+scene.setHud(({match,spell,aimFeedback})=>{
   const ready=match.phase==='MovementAiming',player=match.players[match.active]
-  document.querySelector<HTMLButtonElement>('#aim-pad')!.disabled=!ready
+  if(!ready&&aimPointer!==undefined)resetWheel()
+  aimWheel.disabled=!ready
+  aimWheel.style.setProperty('--wheel-progress',`${player.power*360}deg`)
+  const knobRange=Math.max(6,(aimWheel.querySelector('.wheel-disc')!.clientWidth-24)/2)
+  aimWheel.style.setProperty('--wheel-x',`${Math.cos(player.aimAngle)*player.power*knobRange}px`)
+  aimWheel.style.setProperty('--wheel-y',`${Math.sin(player.aimAngle)*player.power*knobRange}px`)
+  aimWheel.style.setProperty('--wheel-angle',`${player.aimAngle*180/Math.PI}deg`)
+  const readout=document.querySelector<HTMLElement>('#ship-aim-info')!
+  readout.style.opacity=String(aimFeedback.alpha)
+  readout.setAttribute('aria-hidden',String(aimFeedback.alpha===0))
+  // Keep the two small panels on screen even when a ship is near a world edge.
+  const x=Math.max(62,Math.min(window.innerWidth-62,aimFeedback.x)),y=Math.max(145,aimFeedback.y-34)
+  readout.style.left=`${x}px`;readout.style.top=`${Math.min(y,window.innerHeight-120)}px`
+  document.querySelector('#ship-power')!.textContent=String(aimFeedback.power)
+  document.querySelector('#ship-angle')!.textContent=`${aimFeedback.angle}°`
   document.querySelectorAll<HTMLButtonElement>('.spell').forEach((button,i)=>{button.disabled=!ready;button.classList.toggle('selected',i===spell);button.setAttribute('aria-pressed',String(i===spell))})
   document.querySelector<HTMLElement>('.hud')!.dataset.count=String(match.players.length)
   document.querySelectorAll<HTMLElement>('.health-card').forEach((card,i)=>{

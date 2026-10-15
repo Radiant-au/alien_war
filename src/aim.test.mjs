@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { dragAim } from './aim.ts'
+import { aimFeedbackAlpha, dragAim } from './aim.ts'
 import { createMatch, fire } from './match.ts'
 import { createShot, trajectory } from './projectile.ts'
 
@@ -30,4 +30,13 @@ test('aim drag gates firing and short dotted preview uses real shot physics with
   assert.ok(points[0].x>player.x)
   assert.equal(fire(match),true)
   assert.deepEqual(match.shot,shot)
+})
+
+test('ship readout stays visible while dragging, holds after release, then fades to hidden', () => {
+  assert.equal(aimFeedbackAlpha(0,-Infinity,false),0)
+  assert.equal(aimFeedbackAlpha(100,0,true),1)
+  assert.equal(aimFeedbackAlpha(10.9,10,false),1)
+  assert.ok(Math.abs(aimFeedbackAlpha(11.45,10,false)-.5)<1e-9)
+  assert.equal(aimFeedbackAlpha(12,10,false),0)
+  assert.equal(aimFeedbackAlpha(12,12,false),1)
 })

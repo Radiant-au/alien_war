@@ -7,3 +7,9 @@ export function dragAim(dx: number, dy: number, reach: number) {
     power: Math.max(.15, Math.min(1, Math.hypot(dx, dy) / Math.max(1, reach))),
   }
 }
+
+/** Hold the readout briefly after release, then fade without changing the saved aim. */
+export function aimFeedbackAlpha(now: number, lastInteraction: number, dragging: boolean) {
+  if (dragging) return 1
+  return Math.max(0, Math.min(1, 1 - (now - lastInteraction - 1.2) / .5))
+}
