@@ -19,12 +19,17 @@ app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien art
 ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="player-name" title="${ship.name}">P${i+1}</span><div class="health-track" role="progressbar" aria-label="${ship.name} health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-${i}-bar"></i></div><strong id="health-${i}">100</strong></div>`).join('')}
 <div class="brand"><h1><span>Crater</span><br><b>Clash</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
 <nav class="utilities" aria-label="Match options"><label for="player-count">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
-<footer class="command-bar" aria-label="Weapon controls">
-  <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
-  <div class="spell-controls" role="group" aria-label="Choose weapon">${spells.map((s,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><svg viewBox="0 0 48 48" aria-hidden="true">${icons[i]}</svg></span><span>${s}</span></button>`).join('')}</div>
+<section class="field-controls" aria-label="Battlefield controls">
   <button id="aim-wheel" aria-label="Drag aim wheel: farther increases power; direction changes angle. Arrow keys adjust; X reverses." title="Drag the wheel: direction = angle, distance = power. ↑ ↓ angle, ← → power, X reverse."><span class="wheel-disc"><span class="wheel-face"><span class="wheel-needle"></span><span class="wheel-knob"></span><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="1"/><path d="M24 8v8m0 16v8M8 24h8m16 0h8" stroke="currentColor" stroke-width="1.5"/></svg></span></span><span class="wheel-caption">DRAG AIM</span></button>
+  <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
+</section>
+<footer class="command-bar" aria-label="Weapon controls">
+  <div class="spell-controls" role="group" aria-label="Choose weapon">${spells.map((s,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><svg viewBox="0 0 48 48" aria-hidden="true">${icons[i]}</svg></span><span>${s}</span></button>`).join('')}</div>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
-</footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div><p class="help">Drag the bottom wheel · Farther = more power · A / D to move · Space to fire</p>`
+</footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
+
+const commandBar=document.querySelector<HTMLElement>('.command-bar')!
+new ResizeObserver(()=>app.style.setProperty('--command-height',`${commandBar.getBoundingClientRect().height}px`)).observe(commandBar)
 
 export const scene = new LandscapeScene()
 new Phaser.Game({ type: Phaser.CANVAS, parent:'game-area', transparent:true, scale:{mode:Phaser.Scale.RESIZE,width:window.innerWidth,height:window.innerHeight},scene:[scene] })
@@ -41,7 +46,7 @@ const resetWheel=()=>{
 const endAim=(e:PointerEvent)=>{if(e.pointerId===aimPointer)resetWheel()}
 const updateWheel=(e:PointerEvent)=>{
   const r=aimWheel.querySelector('.wheel-disc')!.getBoundingClientRect()
-  scene.dragWheel(e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2,Math.max(72,r.width*1.6))
+  scene.dragWheel(e.clientX-r.left-r.width/2,e.clientY-r.top-r.height/2,r.width*.5)
 }
 aimWheel.addEventListener('pointerdown',e=>{
   if(aimPointer!==undefined||e.button!==0||!e.isPrimary||!scene.beginAim(e.pointerId))return
@@ -77,7 +82,7 @@ scene.setHud(({match,spell,aimFeedback})=>{
   if(!ready&&aimPointer!==undefined)resetWheel()
   aimWheel.disabled=!ready
   aimWheel.style.setProperty('--wheel-progress',`${player.power*360}deg`)
-  const knobRange=Math.max(6,(aimWheel.querySelector('.wheel-disc')!.clientWidth-24)/2)
+  const knobRange=Math.max(6,(aimWheel.querySelector('.wheel-disc')!.clientWidth-aimWheel.querySelector('.wheel-knob')!.clientWidth)/2-8)
   aimWheel.style.setProperty('--wheel-x',`${Math.cos(player.aimAngle)*player.power*knobRange}px`)
   aimWheel.style.setProperty('--wheel-y',`${Math.sin(player.aimAngle)*player.power*knobRange}px`)
   aimWheel.style.setProperty('--wheel-angle',`${player.aimAngle*180/Math.PI}deg`)
