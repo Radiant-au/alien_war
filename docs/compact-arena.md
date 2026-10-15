@@ -1,22 +1,23 @@
 # Colorful compact arena
 
-The terrain now uses a teal-to-blue-to-indigo soil gradient, clipped depth bands, seeded angular rock facets and fourteen cyan/purple crystal clusters. A mint rim follows the original supported surface; destroyed grass stays removed. Facets, stones and crystals use the existing terrain mask, so explosions carve through the visuals and collision data together. The camera places the ground lower, leaving more sky above the four ships.
+The terrain now uses a teal-to-blue-to-indigo soil gradient, clipped depth bands, seeded angular rock facets and fourteen cyan/purple crystal clusters. A mint rim follows the original supported surface; destroyed grass stays removed. Facets, stones and crystals use the existing terrain mask, so explosions carve through the visuals and collision data together. The camera places the ground lower, leaving more sky above the four ships. The world is now 3,360 units wide (40% wider than the earlier 2,400-unit arena). Three intervening ridges block straight sightlines between neighboring spawns, while arcing shots can still reach opponents.
 
-The top HUD uses slim player-colored health pills with P1–P4 and live health values. The bottom bar stays in one compact row, including on a 320px screen: movement, fuel, four weapons and Fire. The Angle and Power dials are removed.
+The top HUD uses slim player-colored health pills with P1–P4 and live health values. The bottom bar stays in one compact row, including on a 320px screen: movement, fuel, four weapons, a circular aim wheel and Fire. The Angle and Power dials are removed.
 
 ## Aiming
 
-- Drag on the battlefield from your ship toward the direction you want to shoot. Distance from the ship sets shot strength, bounded to 15–100%.
+- Drag the circular wheel in the bottom command bar. Direction from its center sets the firing angle and facing; dragging farther increases strength, bounded to 15–100%. Dragging may continue beyond the wheel because it captures the pointer.
+- A center tap reveals the current values without changing them. The two small Power and Angle panels appear above the active ship, stay visible while dragging, hold for 1.2 seconds after release, then fade over 0.5 seconds. The saved aim remains unchanged.
 - Release to keep the aim; press Fire or Space to shoot. Releasing does not auto-fire.
 - Aim in either direction. The short preview has at most nine fading, small dots and uses the same projectile simulation as the real shot.
 - Movement pauses during an aim drag. Pointer cancellation or losing focus clears the drag and unlocks Fire.
-- For keyboard aiming, focus Drag to Aim: Up/Down changes elevation, Left/Right changes strength, X reverses direction. A/D moves when focus is on the battlefield. Movement buttons and the fuel bar remain available for touch.
+- For keyboard aiming, focus the aim wheel: Up/Down changes elevation, Left/Right changes strength, X reverses direction. A/D moves when focus is on the battlefield. Movement buttons and the fuel bar remain available for touch.
 
 No new raster assets are needed by the game. Terrain and effects remain procedural Phaser/canvas drawings.
 
 ## Validation
 
-Production build and 29 unit tests pass. Chromium checks cover mouse aiming in both directions, keyboard aiming without accidental movement, real touch drag/cancel, fuel drain, firing, craters, next turns, 2/3/4-player matches and layouts at 1672×940, 1280×720, 844×390, 390×844 and 320×640. Desktop and small-screen screenshots were visually inspected.
+Production build and 32 unit tests pass. Chromium checks cover mouse aiming in both directions, keyboard aiming without accidental movement, wheel power/direction, center-tap stability, idle fade without changing aim, real touch drag/cancel, fuel drain, firing, craters, next turns, 2/3/4-player matches and layouts at 1672×940, 1280×720, 844×390, 390×844 and 320×640. Desktop and small-screen screenshots were visually inspected. New regression tests cover the idle fade, all neighboring sightlines, and arcing shots over the new ridges.
 
 ## Image concept
 

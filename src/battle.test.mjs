@@ -35,3 +35,30 @@ test('each spell uses its blast radius and damage, then gives the next player a 
     assert.equal(player.grounded,true)
   }
 })
+
+test('wide arena ridges block the straight sightline between every neighboring spawn',()=>{
+  for(const count of [2,3,4]){
+    const match=createMatch(42,count)
+    for(let i=0;i<count-1;i++){
+      const left=match.players[i],right=match.players[i+1]
+      let blocked=false
+      for(let x=Math.ceil(left.x+60);x<right.x-60;x++){
+        const lineY=left.y+(right.y-left.y)*(x-left.x)/(right.x-left.x)
+        if(surfaceAt(match.terrain,x)<lineY-15){blocked=true;break}
+      }
+      assert.ok(blocked,`no blocking ridge between P${i+1} and P${i+2}`)
+    }
+  }
+})
+
+test('neighboring ships remain reachable with arcing shots over the new ridges',()=>{
+  const match=createMatch(42,4)
+  for(const [shooter,power,degrees] of [[0,.45,26],[1,.45,52],[2,.55,42]]){
+    const player=match.players[shooter]
+    player.power=power;player.aimAngle=-degrees*Math.PI/180
+    const shot=createShot(player);let result
+    for(let i=0;i<1440&&!result;i++)result=stepShot(shot,match.terrain,match.players)
+    assert.equal(result?.kind,'impact')
+    assert.equal(result.target,shooter+1)
+  }
+})

@@ -48,11 +48,11 @@ export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
     return state / 0x100000000;
   };
   const anchors = [
-    [0, .38], [.12, .38], [.145, .48], [.175, .48], [.19, .61], [.22, .61],
-    [.27, .80], [.31, .82], [.335, .81], [.35, .72], [.425, .72], [.47, .23],
-    [.50, .23], [.53, .52], [.545, .52], [.56, .60], [.635, .60], [.65, .77],
-    [.69, .83], [.74, .81], [.79, .66], [.82, .66], [.84, .49], [.86, .49],
-    [.875, .44], [.96, .44], [.975, .49], [1, .49],
+    [0, .40], [.125, .40], [.15, .51], [.185, .51], [.21, .69], [.23, .69],
+    [.255, .28], [.275, .28], [.30, .82], [.33, .82], [.35, .72], [.425, .72],
+    [.47, .20], [.50, .20], [.535, .54], [.55, .54], [.565, .64], [.635, .64],
+    [.66, .82], [.70, .82], [.745, .30], [.765, .30], [.79, .68], [.82, .68],
+    [.85, .47], [.96, .47], [.98, .52], [1, .52],
   ];
   const variation = random() * 10 - 5;
   const heights = Array.from({ length: WORLD_WIDTH + 1 }, (_, x) => {
@@ -61,7 +61,7 @@ export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
     const a = anchors[index], b = anchors[Math.min(index + 1, anchors.length - 1)];
     const t = (u - a[0]) / (b[0] - a[0]);
     // Keep ramps angular, while the two deep basins have gently rounded floors.
-    const rounded = (u > .22 && u < .35) || (u > .635 && u < .79);
+    const rounded = (u > .275 && u < .35) || (u > .635 && u < .70);
     const blend = rounded ? t * t * (3 - 2 * t) : t;
     return (a[1] + (b[1] - a[1]) * blend) * WORLD_HEIGHT + variation;
   });

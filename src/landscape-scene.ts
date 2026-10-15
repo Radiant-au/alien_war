@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { dragAim } from './aim.ts'
+import { aimFeedbackAlpha, dragAim } from './aim.ts'
 import { WORLD_WIDTH } from './config.ts'
 import { createMatch, fire, overviewScrollX, overviewZoom, resolveShot, updateMatch, type Match } from './match.ts'
 import { createShot, STEP_SECONDS, stepShot, trajectory } from './projectile.ts'
@@ -8,7 +8,10 @@ import { SPELLS, type Spell } from './spells.ts'
 import { drawShip, SHIPS } from './ships.ts'
 import { shipPose } from './ship-motion.ts'
 
-export interface BattleHud { match:Match; spell:number }
+export interface BattleHud {
+  match:Match; spell:number
+  aimFeedback:{alpha:number;x:number;y:number;angle:number;power:number}
+}
 interface Crystal { x:number;y:number;color:number;size:number }
 
 export class LandscapeScene extends Phaser.Scene {
@@ -31,6 +34,7 @@ export class LandscapeScene extends Phaser.Scene {
   private previousX:number[]=[]
   private trail:{x:number;y:number}[]=[]
   private baseScrollY=0
+  private lastAimTime=-Infinity
   private hud:(hud:BattleHud)=>void=()=>{}
   private resizeObserver?:ResizeObserver
   private reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -63,19 +67,28 @@ export class LandscapeScene extends Phaser.Scene {
   aim(elevation:number,power:number){
     if(this.match.phase!=='MovementAiming')return
     const player=this.match.players[this.match.active],angle=-elevation*Math.PI/180
-    player.aimAngle=Math.cos(player.aimAngle)>=0?angle:Math.PI-angle;player.power=power/100
+    player.aimAngle=Math.cos(player.aimAngle)>=0?angle:Math.PI-angle;player.power=power/100;this.lastAimTime=this.elapsed
   }
-  aimAt(screenX:number,screenY:number){
-    if(this.match.phase!=='MovementAiming')return
-    const cam=this.cameras.main,point=cam.getWorldPoint(screenX,screenY)
-    const player=this.match.players[this.match.active]
-    const reach=Math.max(110,Math.min(this.scale.width,cam.height)*.36)/cam.zoom
-    const next=dragAim(point.x-player.x,point.y-player.y,reach)
+  beginAim(pointer:number){
+    if(this.match.phase!=='MovementAiming'||this.match.pointerId!==undefined)return false
+    this.match.pointerId=pointer;this.lastAimTime=this.elapsed
+    return true
+  }
+  dragWheel(dx:number,dy:number,reach:number){
+    if(this.match.phase!=='MovementAiming'||this.match.pointerId===undefined)return
+    this.lastAimTime=this.elapsed
+    // A center tap reveals the values without changing the previous shot setup.
+    if(Math.hypot(dx,dy)<6)return
+    const next=dragAim(dx,dy,reach),player=this.match.players[this.match.active]
     player.aimAngle=next.angle;player.power=next.power
+  }
+  endAim(){
+    if(this.match.pointerId!==undefined)this.lastAimTime=this.elapsed
+    this.match.pointerId=undefined
   }
   flipAim(){
     if(this.match.phase==='MovementAiming'){
-      const player=this.match.players[this.match.active];player.aimAngle=Math.PI-player.aimAngle
+      const player=this.match.players[this.match.active];player.aimAngle=Math.PI-player.aimAngle;this.lastAimTime=this.elapsed
     }
   }
   hold(pointer:number,axis:-1|1){if(this.match.phase==='MovementAiming')this.held.set(pointer,axis)}
@@ -88,7 +101,7 @@ export class LandscapeScene extends Phaser.Scene {
     }
   }
   private keyUp=(event:KeyboardEvent)=>{this.keys.delete(event.code)}
-  private clearInputs=()=>{this.held.clear();this.keys.clear();this.match.pointerId=undefined}
+  private clearInputs=()=>{this.held.clear();this.keys.clear();this.match.pointerId=undefined;this.lastAimTime=-Infinity}
   cast(){if(fire(this.match)){this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()}}
   restart(count=this.match.players.length){
     this.clearInputs();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
@@ -213,7 +226,14 @@ export class LandscapeScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.scale.width/960*this.match.cameraZoom)
       this.baseScrollY=300-this.cameras.main.height*.72/this.cameras.main.zoom
     }
-    this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell})
+    this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell,aimFeedback:this.aimFeedback()})
+  }
+  private aimFeedback(){
+    const p=this.match.players[this.match.active],cam=this.cameras.main
+    const alpha=this.match.phase==='MovementAiming'?aimFeedbackAlpha(this.elapsed,this.lastAimTime,this.match.pointerId!==undefined):0
+    const pose=shipPose(this.match.terrain,p,this.elapsed,this.reducedMotion)
+    return {alpha,x:(p.x-cam.scrollX)*cam.zoom,y:(pose.y-cam.scrollY)*cam.zoom,
+      angle:Math.round(Math.atan2(-Math.sin(p.aimAngle),Math.abs(Math.cos(p.aimAngle)))*180/Math.PI),power:Math.round(p.power*100)}
   }
   private drawAlien(player:Player,dt:number){
     if(player.health<=0)return
