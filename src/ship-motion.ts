@@ -5,11 +5,11 @@ import { surfaceAt, type Player, type Terrain } from './terrain.ts'
 export function shipPose(terrain: Terrain, player: Player, time: number, reducedMotion = false) {
   const half = PLAYER_WIDTH / 2
   const slope = Math.atan2(surfaceAt(terrain, player.x + half) - surfaceAt(terrain, player.x - half), PLAYER_WIDTH)
-  const bob = reducedMotion ? 0 : Math.sin(time * 2.4 + player.id * 1.7) * 1.8
+  const bob = reducedMotion || !player.grounded ? 0 : Math.sin(time * 1.8 + player.id * 1.7) * 8
   return {
-    x: player.x, y: player.y - 2 + bob,
+    x: player.x, y: player.y - 6 + bob,
     groundY: player.y + PLAYER_HEIGHT / 2,
-    angle: player.grounded ? Math.max(-.55, Math.min(.55, slope)) : 0,
+    angle: player.grounded ? Math.max(-.55, Math.min(.55, slope)) + (reducedMotion ? 0 : Math.sin(time * 1.8 + player.id * 1.7) * .045) : 0,
     pulse: reducedMotion ? .3 : (time * .7 + player.id * .23) % 1,
   }
 }

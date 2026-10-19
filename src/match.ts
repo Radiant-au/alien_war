@@ -72,14 +72,21 @@ export function fire(match: Match): boolean {
   return true
 }
 
-export function resolveShot(match: Match, result: TerminalResult, blast = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
+export function resolveShot(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean } = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
   match.shot = undefined
   match.impactX = result.kind === 'impact' ? result.x : undefined
   if (result.kind === 'impact') {
     const radius = blast.radius
     match.explosion = { x: result.x, y: result.y, time: 0.2 }
-    carveCrater(match.terrain, result.x, result.y, radius)
-    for (const player of match.players) player.health = Math.max(0, player.health - explosionDamage(player, result.x, result.y, radius, blast.damage))
+    if (blast.destroyTerrain !== false) carveCrater(match.terrain, result.x, result.y, radius)
+    for (const player of match.players) {
+      const damage = explosionDamage(player, result.x, result.y, radius, blast.damage)
+      player.health = Math.max(0, player.health - damage)
+      if (damage > 0 && player.health > 0) {
+        player.grounded = false
+        player.velocityY = -Math.min(360, 120 + damage * 2)
+      }
+    }
   }
   match.phase = 'Impact'
 }

@@ -40,3 +40,20 @@ test('ship readout stays visible while dragging, holds after release, then fades
   assert.equal(aimFeedbackAlpha(12,10,false),0)
   assert.equal(aimFeedbackAlpha(12,12,false),1)
 })
+
+test('aiming trajectory clears shooter corner angles without colliding with own ship', () => {
+  const match = createMatch(42, 4)
+  match.phase = 'MovementAiming'
+  const player = match.players[0]
+  for (let deg = 3; deg <= 87; deg += 1) {
+    for (const dir of [1, -1]) {
+      const angle = dir === 1 ? -deg * Math.PI / 180 : Math.PI - (-deg * Math.PI / 180)
+      player.aimAngle = angle
+      player.power = 0.5
+      const shot = createShot(player)
+      const points = trajectory(shot, match.terrain, match.players, 0.55)
+      assert.ok(points.length > 1, `trajectory blocked at angle ${deg}° (dir=${dir})`)
+    }
+  }
+})
+

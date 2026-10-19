@@ -6,12 +6,6 @@ import { SHIPS } from './ships.ts'
 import { MOVEMENT_ALLOWANCE } from './config.ts'
 import { LandscapeScene } from './landscape-scene.ts'
 
-const icons = [
-  '<path d="M8 34 35 7 29 24 42 21 15 44 21 28Z" fill="#35d8ff"/><circle cx="36" cy="12" r="8" fill="#e5fbff"/>',
-  '<path d="M25 4C30 18 42 20 38 34S12 47 11 31c-1-8 6-13 8-19 0 8 4 9 6-8Z" fill="#ff9b32"/><path d="M26 23c9 9 5 18-2 18s-10-7 2-18Z" fill="#ffdc70"/>',
-  '<path d="M38 17C27-1 4 17 12 33s31 9 27-3-21-12-19-2 11 8 11 2" fill="none" stroke="#b663f8" stroke-width="6" stroke-linecap="round"/>',
-  '<path d="m24 4 9 22-9 19-9-19ZM8 23l7 13-7 9-6-9Zm32-5 7 17-7 10-6-10Z" fill="#56e4ff"/>'
-]
 const spells = SPELLS.map(spell => spell.name)
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien artillery battlefield"></main>
@@ -24,7 +18,7 @@ ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
 </section>
 <footer class="command-bar" aria-label="Weapon controls">
-  <div class="spell-controls" role="group" aria-label="Choose weapon">${spells.map((s,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><svg viewBox="0 0 48 48" aria-hidden="true">${icons[i]}</svg></span><span>${s}</span></button>`).join('')}</div>
+  <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.effect}.jpeg" alt="" /></span><span>${spell.name}</span></button>`).join('')}</div>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
 </footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
 
@@ -77,7 +71,11 @@ for(const [id,axis]of [['move-left',-1],['move-right',1]]as const){
   button.addEventListener('pointerdown',e=>{if(button.disabled)return;e.preventDefault();button.setPointerCapture(e.pointerId);scene.hold(e.pointerId,axis)})
 }
 window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)&&!(e.target instanceof HTMLSelectElement)){e.preventDefault();scene.cast()}})
+const displayedHealth=SHIPS.map(()=>100)
+let healthAnimationTime=performance.now()
 scene.setHud(({match,spell,aimFeedback})=>{
+  const now=performance.now(),healthTicks=now-healthAnimationTime>=24?1:0
+  if(healthTicks)healthAnimationTime=now
   const ready=match.phase==='MovementAiming',player=match.players[match.active]
   if(!ready&&aimPointer!==undefined)resetWheel()
   aimWheel.disabled=!ready
@@ -99,10 +97,13 @@ scene.setHud(({match,spell,aimFeedback})=>{
   document.querySelectorAll<HTMLElement>('.health-card').forEach((card,i)=>{
     const p=match.players[i];card.hidden=!p
     if(!p)return
-    document.querySelector(`#health-${i}`)!.textContent=String(p.health)
-    card.title=p.health>0?`${SHIPS[i].name}: ${p.health} health`:`${SHIPS[i].name}: eliminated`
-    document.querySelector<HTMLElement>(`#health-${i}-bar`)!.style.width=`${p.health}%`
-    card.querySelector('.health-track')!.setAttribute('aria-valuenow',String(p.health))
+    if(p.health>displayedHealth[i])displayedHealth[i]=p.health
+    else if(healthTicks>0&&p.health<displayedHealth[i])displayedHealth[i]=Math.max(p.health,displayedHealth[i]-healthTicks)
+    const shownHealth=displayedHealth[i]
+    document.querySelector(`#health-${i}`)!.textContent=String(shownHealth)
+    card.title=p.health>0?`${SHIPS[i].name}: ${shownHealth} health`:`${SHIPS[i].name}: eliminated`
+    document.querySelector<HTMLElement>(`#health-${i}-bar`)!.style.width=`${shownHealth}%`
+    card.querySelector('.health-track')!.setAttribute('aria-valuenow',String(shownHealth))
     card.classList.toggle('active',match.active===i&&ready);card.classList.toggle('eliminated',p.health<=0)
   })
   const fuel=Math.max(0,Math.min(100,player.movementRemaining/MOVEMENT_ALLOWANCE*100))

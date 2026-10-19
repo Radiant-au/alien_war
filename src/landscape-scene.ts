@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from './aim.ts'
 import { WORLD_WIDTH } from './config.ts'
 import { createMatch, fire, overviewScrollX, overviewZoom, resolveShot, updateMatch, type Match } from './match.ts'
-import { createShot, STEP_SECONDS, stepShot, trajectory } from './projectile.ts'
+import { createShot, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory } from './projectile.ts'
 import { surfaceAt, type Player } from './terrain.ts'
 import { SPELLS, type Spell } from './spells.ts'
 import { drawShip, SHIPS } from './ships.ts'
@@ -13,6 +13,13 @@ export interface BattleHud {
   aimFeedback:{alpha:number;x:number;y:number;angle:number;power:number}
 }
 interface Crystal { x:number;y:number;color:number;size:number }
+interface TerrainPatch {
+  graphic:Phaser.GameObjects.Graphics;x:number;radius:number;fillColor:number;fillAlpha:number
+  strokeColor:number;strokeAlpha:number;strokeWidth:number;thickness:number
+}
+const MISSILE_TEXTURES:Record<Spell['effect'],string>={
+  ice:'missile-ice',poison:'missile-poison',electric:'missile-electric',fire:'missile-fire',
+}
 
 export class LandscapeScene extends Phaser.Scene {
   match=createMatch(0x51a7,4)
@@ -25,7 +32,11 @@ export class LandscapeScene extends Phaser.Scene {
   private held=new Map<number,-1|1>()
   private crystalGlows:Phaser.GameObjects.Image[]=[]
   private crystals:Crystal[]=[]
+  private burningUntil=new Map<number,number>()
   private particles:Phaser.GameObjects.GameObject[]=[]
+  private missile?:Phaser.GameObjects.Sprite
+  private terrainAnchors=new Map<Phaser.GameObjects.GameObject,{x:number;offsetY:number}>()
+  private terrainPatches:TerrainPatch[]=[]
   private revision=-1
   private elapsed=0
   private stepAccumulator=0
@@ -40,7 +51,20 @@ export class LandscapeScene extends Phaser.Scene {
   private reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches
   constructor(){super('battlefield')}
   setHud(callback:(hud:BattleHud)=>void){this.hud=callback}
+  preload(){
+    this.load.spritesheet('fire-impact','/assets/fire_explosion_32_grid.png',{frameWidth:256,frameHeight:256})
+    this.load.spritesheet('electric-impact','/assets/electric_weapon_16.png',{frameWidth:256,frameHeight:256})
+    for(const type of ['ice','poison','electric','fire'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
+  }
   create(){
+    if(!this.anims.exists('fire-impact-blast'))this.anims.create({key:'fire-impact-blast',frames:this.anims.generateFrameNumbers('fire-impact',{start:0,end:4}),frameRate:15,repeat:0})
+    if(!this.anims.exists('fire-impact-burn'))this.anims.create({key:'fire-impact-burn',frames:this.anims.generateFrameNumbers('fire-impact',{start:5,end:23}),frameRate:8,repeat:2})
+    if(!this.anims.exists('fire-impact-fade'))this.anims.create({key:'fire-impact-fade',frames:this.anims.generateFrameNumbers('fire-impact',{start:24,end:31}),frameRate:7,repeat:0})
+    if(!this.anims.exists('electric-impact-animation'))this.anims.create({key:'electric-impact-animation',frames:this.anims.generateFrameNumbers('electric-impact',{start:0,end:15}),frameRate:18,repeat:0})
+    for(const type of ['ice','poison','electric','fire']){
+      const key=`missile-${type}-travel`
+      if(!this.anims.exists(key))this.anims.create({key,frames:this.anims.generateFrameNumbers(`missile-${type}`,{start:0,end:3}),frameRate:type==='electric'?16:14,repeat:-1})
+    }
     const halo=document.createElement('canvas');halo.width=halo.height=128
     const ctx=halo.getContext('2d')!,gradient=ctx.createRadialGradient(64,64,0,64,64,64)
     gradient.addColorStop(0,'rgba(255,255,255,.65)');gradient.addColorStop(.25,'rgba(255,255,255,.20)');gradient.addColorStop(1,'rgba(255,255,255,0)')
@@ -61,6 +85,9 @@ export class LandscapeScene extends Phaser.Scene {
       window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp)
       this.resizeObserver?.disconnect();this.scale.off(Phaser.Scale.Events.RESIZE,this.resizeView,this)
       window.removeEventListener('blur',this.clearInputs);window.removeEventListener('pointerup',this.releasePointer);window.removeEventListener('pointercancel',this.releasePointer);document.removeEventListener('visibilitychange',this.visibility)
+      this.clearMissile()
+      for(const particle of this.particles){this.tweens.killTweensOf(particle);particle.destroy()}
+      this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     })
   }
   selectSpell(index:number){if(this.match.phase==='MovementAiming')this.selectedSpell=Math.max(0,Math.min(SPELLS.length-1,index))}
@@ -102,10 +129,17 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private keyUp=(event:KeyboardEvent)=>{this.keys.delete(event.code)}
   private clearInputs=()=>{this.held.clear();this.keys.clear();this.match.pointerId=undefined;this.lastAimTime=-Infinity}
-  cast(){if(fire(this.match)){this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()}}
+  cast(){
+    if(!fire(this.match))return
+    this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()
+    const shot=this.match.shot!,texture=MISSILE_TEXTURES[this.shotSpell.effect]
+    this.missile=this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5)
+    this.missile.play(`missile-${this.shotSpell.effect}-travel`)
+    this.syncMissile()
+  }
   restart(count=this.match.players.length){
-    this.clearInputs();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
-    this.previousX=this.match.players.map(p=>p.x);for(const p of this.particles){this.tweens.killTweensOf(p);p.destroy()}this.particles=[]
+    this.clearInputs();this.clearMissile();this.burningUntil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
+    this.previousX=this.match.players.map(p=>p.x);for(const p of this.particles){this.tweens.killTweensOf(p);p.destroy()}this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     if(this.actors){this.generateCrystals();this.drawTerrain();this.resizeView()}
   }
   private resizeView=()=>{
@@ -133,9 +167,9 @@ export class LandscapeScene extends Phaser.Scene {
     for(let i=0;i<14;i++){
       const x=WORLD_WIDTH*(.035+i*.071),y=surfaceAt(this.match.terrain,x)+48+(i%4)*36,color=i%2?0xb45cf5:0x39daff
       this.crystals.push({x,y,color,size:12+(i%3)*3})
-      const glow=this.add.image(x,y,'halo').setTint(color).setDisplaySize(120,120).setAlpha(.35).setDepth(1)
+      const glow=this.add.image(x,y,'halo').setTint(color).setDisplaySize(145,145).setAlpha(.42).setDepth(1)
       this.crystalGlows.push(glow)
-      if(!this.reducedMotion)this.tweens.add({targets:glow,alpha:.55,duration:1800+i*170,yoyo:true,repeat:-1,ease:'Sine.easeInOut'})
+      if(!this.reducedMotion)this.tweens.add({targets:glow,alpha:.8,scale:1.2,y:y-12,duration:1700+i*110,yoyo:true,repeat:-1,ease:'Sine.easeInOut'})
     }
   }
   private drawTerrain(){
@@ -212,15 +246,16 @@ export class LandscapeScene extends Phaser.Scene {
     const beforePhase=this.match.phase
     while(this.stepAccumulator>=STEP_SECONDS){
       if(this.match.phase==='ProjectileFlight'&&this.match.shot){
-        const result=stepShot(this.match.shot,this.match.terrain,this.match.players)
-        if(result){resolveShot(this.match,result,this.shotSpell);if(result.kind==='impact')this.impact(result.x,result.y,this.shotSpell);this.trail=[]}
+        const result=stepShot(this.match.shot,this.match.terrain,this.match.players,STEP_SECONDS*PROJECTILE_SPEED_MULTIPLIER)
+        if(result){resolveShot(this.match,result,this.shotSpell);if(result.kind==='impact')this.impact(result.x,this.shotSpell,result.target);this.trail=[];this.clearMissile()}
       }
       updateMatch(this.match,STEP_SECONDS,axis);this.stepAccumulator-=STEP_SECONDS
     }
     if(beforePhase!==this.match.phase)this.clearInputs()
     this.match.players.forEach((p,i)=>{this.moving[i]=Math.abs(p.x-this.previousX[i])>.001;this.previousX[i]=p.x})
-    if(this.revision!==this.match.terrain.revision)this.drawTerrain()
+    if(this.revision!==this.match.terrain.revision){this.drawTerrain();this.refreshTerrainEffects()}
     if(this.match.shot){this.trail.push({x:this.match.shot.x,y:this.match.shot.y});if(this.trail.length>18)this.trail.shift()}
+    this.syncMissile()
     if(this.match.phase==='MovementAiming'){
       this.match.cameraZoom=overviewZoom(this.match.players,this.match.viewWidth)
       this.cameras.main.setZoom(this.scale.width/960*this.match.cameraZoom)
@@ -250,10 +285,19 @@ export class LandscapeScene extends Phaser.Scene {
         g.lineStyle(1.5,color,(1-pulse)*.40);g.strokeEllipse(0,-1,44+pulse*64,6+pulse*12)
       }
       g.restore()
+      g.fillStyle(color,this.reducedMotion?.16:.16+Math.sin(this.elapsed*4+kind)*.08)
+      g.fillEllipse(pose.x,pose.y+18,42,13)
     }
     g.save();g.translateCanvas(pose.x,pose.y);g.rotateCanvas(tilt);g.scaleCanvas(dir*1.5,1.5)
     const thrust=this.moving[kind]&&!this.reducedMotion?.5+Math.sin(this.elapsed*18)*.25:0
     drawShip(g,kind,thrust);g.restore()
+    if((this.burningUntil.get(kind)??0)>this.elapsed){
+      const flicker=this.reducedMotion?0:Math.sin(this.elapsed*19+kind*3),top=pose.y-24+flicker*2
+      g.fillStyle(0xff6029,.85);g.fillTriangle(pose.x-20,top+21,pose.x-10,top-4-Math.abs(flicker)*3,pose.x-3,top+22)
+      g.fillTriangle(pose.x+3,top+22,pose.x+11,top-2+flicker*2,pose.x+20,top+21)
+      g.fillStyle(0xffce54,.95);g.fillTriangle(pose.x-15,top+19,pose.x-10,top+5,pose.x-6,top+20)
+      g.fillTriangle(pose.x+7,top+20,pose.x+12,top+4-flicker*2,pose.x+16,top+19)
+    }
     // The weapon keeps the world-space aim angle while the hull follows the slope.
     g.save();g.translateCanvas(player.x,pose.y+4);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.3,1.3)
     g.fillStyle(0x172941);g.fillRoundedRect(5,-4,24,8,3)
@@ -276,24 +320,94 @@ export class LandscapeScene extends Phaser.Scene {
     }
     if(this.match.shot){
       this.trail.forEach((point,i)=>{g.fillStyle(this.shotSpell.color,i/this.trail.length*.5);g.fillCircle(point.x,point.y,2+i/this.trail.length*3)})
-      const {x,y}=this.match.shot;g.fillStyle(this.shotSpell.color,.16);g.fillCircle(x,y,13)
-      g.fillStyle(this.shotSpell.color);if(this.shotSpell===SPELLS[3])g.fillTriangle(x,y-9,x-5,y+5,x+5,y+5);else g.fillCircle(x,y,5)
-      g.fillStyle(0xf5ffff);g.fillCircle(x,y,2)
     }
   }
-  private impact(x:number,y:number,spell:Spell){
-    if(!this.reducedMotion)this.cameras.main.shake(150,.0025)
-    const burst=this.add.graphics().setPosition(x,y).setDepth(4)
-    burst.fillStyle(spell.color,.25);burst.fillCircle(0,0,spell.radius*.6);burst.lineStyle(3,spell.color,.9);burst.strokeCircle(0,0,spell.radius*.6)
-    this.animateEffect(burst,{scale:1.7,alpha:0,duration:550})
-    for(let i=0;i<16;i++){
-      const a=i*Math.PI*2/16,length=spell.radius*(.65+Math.random()*.7)
-      const particle=this.add.graphics().setPosition(x,y).setDepth(4);particle.fillStyle(spell.color)
-      if(spell===SPELLS[3])particle.fillTriangle(0,-5,-3,3,3,3);else particle.fillCircle(0,0,spell===SPELLS[1]?3:2)
-      this.animateEffect(particle,{x:x+Math.cos(a)*length,y:y+Math.sin(a)*length,alpha:0,angle:120,duration:450+Math.random()*250})
+  private syncMissile(){
+    const shot=this.match.shot
+    if(!shot){this.clearMissile();return}
+    if(this.missile?.active)this.missile.setPosition(shot.x,shot.y).setRotation(Math.atan2(shot.vy,shot.vx))
+  }
+  private clearMissile(){this.missile?.destroy();this.missile=undefined}
+  private impact(x:number,spell:Spell,target:'terrain'|number){
+    if(spell.effect==='fire'&&target!=='terrain'&&this.match.players[target]?.health>0)this.burningUntil.set(target,this.elapsed+2.4)
+    if(!this.reducedMotion)this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
+    const radius=spell.radius,depth=2
+    const groundY=surfaceAt(this.match.terrain,x)
+    const flash=this.add.circle(x,groundY,radius*.16,0xffffff,.8).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD)
+    this.animateEffect(flash,{radius:radius*1.3,alpha:0,duration:this.reducedMotion?140:250,ease:'Cubic.Out'})
+    const ring=this.add.graphics().setPosition(x,groundY).setDepth(depth)
+    ring.lineStyle(4,spell.color,.95);ring.strokeCircle(0,0,radius*.32)
+    this.animateEffect(ring,{scale:2.2,alpha:0,duration:this.reducedMotion?220:520,ease:'Cubic.Out'})
+    if(spell.effect==='fire'){
+      const fire=this.add.sprite(x,groundY,'fire-impact').setOrigin(.5,.82).setDisplaySize(radius*2.8,radius*2.8).setDepth(depth)
+      this.anchorToTerrain(fire,x,0)
+      this.trackEffect(fire)
+      fire.once('animationcomplete-fire-impact-fade',()=>this.removeEffect(fire))
+      fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15});fire.chain(['fire-impact-burn','fire-impact-fade'])
+      if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xff8a2b,radius)
+    }else if(spell.effect==='electric'){
+      const pulse=this.add.sprite(x,groundY-radius*.25,'electric-impact').setDisplaySize(radius*2.7,radius*2.7).setDepth(depth)
+      this.anchorToTerrain(pulse,x,-radius*.25)
+      this.trackEffect(pulse);pulse.once(Phaser.Animations.Events.ANIMATION_COMPLETE,()=>this.removeEffect(pulse));pulse.play({key:'electric-impact-animation',frameRate:this.reducedMotion?30:18})
+      const scorch=this.surfacePatch(x,groundY,radius*.9,0x061b27,.72,0x00e5ff,.8,2,5,true).setDepth(depth-1)
+      this.animateEffect(scorch,{alpha:0,scale:.85,duration:this.reducedMotion?300:1100})
+      if(!this.reducedMotion)for(let i=0;i<7;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0x6ffaff,radius*.8)
+    }else if(spell.effect==='poison'){
+      const puddle=this.surfacePatch(x,groundY,radius*1.3,0x1d3a12,.96,0x39ff14,1,4,20,true).setDepth(depth)
+      this.animateEffect(puddle,{alpha:0,scale:.94,duration:this.reducedMotion?500:4800,delay:this.reducedMotion?0:2500})
+      if(!this.reducedMotion)for(let i=0;i<20;i++){
+        const bubbleX=x+(Math.random()-.5)*radius*2
+        this.risingParticle(bubbleX,surfaceAt(this.match.terrain,bubbleX),0x39ff14,radius,Math.floor(i/2)*260,4+Math.random()*3)
+      }
+    }else{
+      const frost=this.surfacePatch(x,groundY,radius*.9,0x80e5ff,.35,0x1a5e7a,.9,2,8,true).setDepth(depth-1)
+      this.animateEffect(frost,{alpha:0,scaleY:.7,duration:this.reducedMotion?350:3300,delay:this.reducedMotion?0:2200})
+      for(let i=0;i<8;i++){
+        const height=radius*(.9+Math.random()*.75),offset=(i/7-.5)*radius*1.8
+        const shardX=x+offset,shardY=surfaceAt(this.match.terrain,shardX)
+        const shard=this.add.graphics().setPosition(shardX,shardY).setDepth(depth)
+        this.anchorToTerrain(shard,shardX,0)
+        shard.fillStyle(0x99f2ff,.98);shard.lineStyle(3,0x1a5e7a,1);shard.beginPath();shard.moveTo(0,-height);shard.lineTo(height*.34,0);shard.lineTo(-height*.34,0);shard.closePath();shard.fillPath();shard.strokePath();shard.setScale(1,.01)
+        this.animateEffect(shard,{scaleY:1,alpha:0,delay:this.reducedMotion?0:i*65+(this.reducedMotion?0:1900),duration:this.reducedMotion?180:500})
+      }
+      if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xb3f6ff,radius*.8)
     }
   }
-  private animateEffect(target:Phaser.GameObjects.Graphics,options:Record<string,unknown>){
-    this.particles.push(target);this.tweens.add({targets:target,...options,onComplete:()=>{this.particles=this.particles.filter(p=>p!==target);target.destroy()}})
+  private surfacePatch(x:number,y:number,radius:number,fillColor:number,fillAlpha:number,strokeColor:number,strokeAlpha:number,strokeWidth:number,thickness:number,followTerrain:boolean){
+    const graphic=this.add.graphics().setPosition(x,y)
+    const patch={graphic,x,radius,fillColor,fillAlpha,strokeColor,strokeAlpha,strokeWidth,thickness}
+    if(followTerrain)this.terrainPatches.push(patch)
+    this.drawSurfacePatch(patch,followTerrain)
+    return graphic
+  }
+  private drawSurfacePatch(patch:TerrainPatch,followTerrain:boolean){
+    const {graphic,x,radius,fillColor,fillAlpha,strokeColor,strokeAlpha,strokeWidth,thickness}=patch
+    const centerY=followTerrain?surfaceAt(this.match.terrain,x):graphic.y
+    if(followTerrain)graphic.setPosition(x,centerY)
+    const points=Array.from({length:13},(_,i)=>{
+      const dx=-radius+radius*2*i/12
+      return {x:dx,y:followTerrain?surfaceAt(this.match.terrain,x+dx)-centerY:0}
+    })
+    graphic.clear();graphic.fillStyle(fillColor,fillAlpha);graphic.lineStyle(strokeWidth,strokeColor,strokeAlpha)
+    graphic.beginPath();points.forEach((point,i)=>i?graphic.lineTo(point.x,point.y):graphic.moveTo(point.x,point.y))
+    graphic.strokePath()
+    for(let i=points.length-1;i>=0;i--)graphic.lineTo(points[i].x,points[i].y+thickness)
+    graphic.closePath();graphic.fillPath()
+  }
+  private anchorToTerrain(target:Phaser.GameObjects.GameObject&{setY:(y:number)=>unknown},x:number,offsetY:number){
+    this.terrainAnchors.set(target,{x,offsetY});target.setY(surfaceAt(this.match.terrain,x)+offsetY)
+  }
+  private refreshTerrainEffects(){
+    for(const [target,anchor]of this.terrainAnchors)if(target.active&&'setY'in target&&typeof target.setY==='function')target.setY(surfaceAt(this.match.terrain,anchor.x)+anchor.offsetY)
+    for(const patch of this.terrainPatches)if(patch.graphic.active)this.drawSurfacePatch(patch,true)
+  }
+  private risingParticle(x:number,y:number,color:number,spread:number,delay=0,size=2+Math.random()*2){
+    const particle=this.add.graphics().setPosition(x,y).setDepth(2);particle.fillStyle(color);particle.fillCircle(0,0,size)
+    this.animateEffect(particle,{x:x+(Math.random()-.5)*spread,y:y-spread*(.3+Math.random()*.7),alpha:0,scale:.2,delay,duration:650+Math.random()*500})
+  }
+  private trackEffect(target:Phaser.GameObjects.GameObject){this.particles.push(target)}
+  private removeEffect(target:Phaser.GameObjects.GameObject){this.particles=this.particles.filter(p=>p!==target);this.terrainAnchors.delete(target);this.terrainPatches=this.terrainPatches.filter(patch=>patch.graphic!==target);target.destroy()}
+  private animateEffect(target:Phaser.GameObjects.GameObject,options:Record<string,unknown>){
+    this.trackEffect(target);this.tweens.add({targets:target,...options,onComplete:()=>this.removeEffect(target)})
   }
 }

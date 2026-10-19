@@ -46,3 +46,15 @@
 @media(max-width:600px){.field-controls{--wheel-size:104px}.field-controls #aim-wheel{left:max(20px,env(safe-area-inset-left));gap:5px}.field-controls .wheel-disc{width:104px;height:104px}.field-controls .wheel-knob{width:24px;height:24px}.field-controls .movement-controls{right:max(20px,env(safe-area-inset-right));width:108px}.field-controls .movement-buttons{gap:8px}.field-controls .movement-buttons button{height:44px;font-size:18px}.field-controls .wheel-caption{font-size:8px}.field-controls .fuel-caption{font-size:7px}.command-bar{grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:8px 12px;padding-bottom:max(8px,env(safe-area-inset-bottom));min-height:60px}.command-bar .spell-controls{grid-column:1;justify-self:center;gap:12px}.command-bar .spell-icon{width:34px;height:34px}.command-bar .spell{font-size:7px}.command-bar #fire{grid-column:2;width:78px;height:38px;font-size:18px}}
 @media(max-width:350px){.field-controls{--wheel-size:96px}.field-controls .wheel-disc{width:96px;height:96px}.field-controls .movement-controls{width:102px}.command-bar{gap:8px;padding-left:8px;padding-right:8px}.command-bar .spell-controls{gap:8px}.command-bar .spell-icon{width:32px;height:32px}.command-bar .spell{font-size:6px}.command-bar #fire{width:70px;font-size:17px}}
 @media(max-height:500px) and (min-width:601px){.field-controls{--wheel-size:96px}.field-controls #aim-wheel{bottom:calc(var(--command-height,58px) + 12px)}.field-controls .movement-controls{bottom:calc(var(--command-height,58px) + 30px)}.field-controls #aim-wheel{left:max(18px,env(safe-area-inset-left))}.field-controls .wheel-disc{width:96px;height:96px}.field-controls .wheel-knob{width:24px;height:24px}.field-controls .movement-controls{right:max(18px,env(safe-area-inset-right));width:108px}.field-controls .movement-buttons button{height:40px}.command-bar{min-height:55px;padding-top:6px;padding-bottom:max(6px,env(safe-area-inset-bottom))}.command-bar .spell-icon{width:32px;height:32px}.command-bar .spell{font-size:7px}.command-bar #fire{height:36px}}
+
+.scenery-stars{animation:stars-breathe 5s ease-in-out infinite alternate}
+.scenery-stars circle{transform-box:fill-box;transform-origin:center;animation:star-twinkle 2.8s ease-in-out infinite alternate}
+.scenery-stars circle:nth-child(3n){animation-delay:-1.2s}.scenery-stars circle:nth-child(4n){animation-delay:-2.1s}
+.scenery-mist{animation:mist-drift 8s ease-in-out infinite alternate}
+.scenery-aurora{transform-box:fill-box;transform-origin:center;animation:aurora-drift 16s ease-in-out infinite alternate}
+@keyframes stars-breathe{to{opacity:.45}}
+@keyframes mist-drift{to{transform:translateX(180px);opacity:.7}}
+@keyframes star-twinkle{to{opacity:.25;transform:scale(.7)}}
+@keyframes aurora-drift{to{transform:translate(100px,-18px) scale(1.12);opacity:.7}}
+@media (prefers-reduced-motion:reduce){.scenery-stars,.scenery-stars circle,.scenery-mist,.scenery-aurora{animation:none}}
+.spell-icon img{width:100%;height:100%;object-fit:cover;border-radius:6px}

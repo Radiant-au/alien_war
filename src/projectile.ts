@@ -4,6 +4,7 @@ import { type Player, type Terrain, surfaceAt } from './terrain.ts'
 export const STEP_SECONDS = 1 / 120
 export const MAX_FLIGHT_SECONDS = 12
 export const PROJECTILE_RADIUS = 4
+export const PROJECTILE_SPEED_MULTIPLIER = 1.7
 export const MIN_SPEED = 120
 export const MAX_SPEED = MAX_LAUNCH_SPEED
 
@@ -23,13 +24,13 @@ export type TerminalResult =
 export function createShot(player: Player): Shot {
   const dx = Math.cos(player.aimAngle)
   const dy = Math.sin(player.aimAngle)
-  const halfWidth = PLAYER_WIDTH / 2
-  const halfHeight = PLAYER_HEIGHT / 2
-  const edge = Math.min(halfWidth / Math.max(Math.abs(dx), 1e-6), halfHeight / Math.max(Math.abs(dy), 1e-6))
+  const halfWidth = PLAYER_WIDTH / 2 + PROJECTILE_RADIUS
+  const halfHeight = PLAYER_HEIGHT / 2 + PROJECTILE_RADIUS
+  const edge = Math.min(halfWidth / Math.max(Math.abs(dx), 1e-6), halfHeight / Math.max(Math.abs(dy), 1e-6)) + 2
   const speed = MIN_SPEED + player.power * (MAX_SPEED - MIN_SPEED)
   return {
-    x: player.x + dx * (edge + PROJECTILE_RADIUS + 2),
-    y: player.y + dy * (edge + PROJECTILE_RADIUS + 2),
+    x: player.x + dx * edge,
+    y: player.y + dy * edge,
     vx: dx * speed,
     vy: dy * speed,
     age: 0,
@@ -93,6 +94,7 @@ export function sweepShot(shot: Shot, terrain: Terrain, players: Player[], x1: n
   if (ground !== undefined) contacts.push({ t: ground, target: 'terrain' })
   for (const player of players) {
     if (player.health <= 0) continue
+    if (player.id === shot.shooter && shot.age === 0) continue
     const t = segmentBoxHit(x0, y0, x1, y1, player)
     if (t !== undefined) contacts.push({ t, target: player.id })
   }

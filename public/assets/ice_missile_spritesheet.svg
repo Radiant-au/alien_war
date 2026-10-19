@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 64" width="512" height="64">
+  <defs>
+    <!-- Reusable Crystalline Frost Rim -->
+    <g id="ice-core-base">
+      <polygon points="78,15 104,17 118,32 104,47 78,49 88,32" fill="#E0FFFF" />
+    </g>
+  </defs>
+
+  <!-- ==================== FRAME 1 (0 to 128) ==================== -->
+  <g transform="translate(0, 0)">
+    <!-- Detached Trailing Ice Shards (Diamond Shapes) -->
+    <polygon points="6,30 14,27 20,30 14,33" fill="#0088FF" />
+    <polygon points="15,17 22,14 27,17 22,20" fill="#33CCFF" />
+    <polygon points="20,46 28,43 34,46 28,49" fill="#0088FF" />
+
+    <!-- Outer Deep Freeze Body (Sharp Crystalline Spikes) -->
+    <polygon points="124,32 106,14 72,11 48,6 60,15 24,13 46,25 10,32 46,39 24,51 60,49 48,58 72,53 106,50" fill="#0066CC" />
+    
+    <!-- Mid Cyan Glacier Layer -->
+    <polygon points="119,32 102,17 74,15 56,12 66,19 38,19 56,28 28,32 56,36 38,45 66,45 56,52 74,49 102,47" fill="#00CCFF" />
+
+    <!-- White-Cyan Frost Highlight -->
+    <use href="#ice-core-base" />
+
+    <!-- Strange Abyssal Frost Core -->
+    <polygon points="113,32 98,21 76,21 60,18 70,26 46,27 64,32 46,37 70,38 60,46 76,43 98,43" fill="#051329" />
+    <!-- Inner Crystalline Glint -->
+    <polygon points="90,32 98,27 107,32 98,37" fill="#14457A" />
+  </g>
+
+  <!-- ==================== FRAME 2 (128 to 256) ==================== -->
+  <g transform="translate(128, 0)">
+    <!-- Detached Trailing Ice Shards -->
+    <polygon points="3,25 10,22 15,25 10,28" fill="#33CCFF" />
+    <polygon points="12,42 20,39 26,42 20,45" fill="#0088FF" />
+    <polygon points="22,13 30,10 35,13 30,16" fill="#0088FF" />
+
+    <!-- Outer Deep Freeze Body -->
+    <polygon points="124,32 106,15 72,12 42,5 56,15 18,18 42,27 16,32 42,37 18,46 56,49 42,59 72,52 106,49" fill="#0066CC" />
+    
+    <!-- Mid Cyan Glacier Layer -->
+    <polygon points="119,32 102,18 74,16 52,11 63,19 32,22 52,29 34,32 52,35 32,42 63,45 52,53 74,48 102,46" fill="#00CCFF" />
+
+    <!-- White-Cyan Frost Highlight -->
+    <use href="#ice-core-base" />
+
+    <!-- Strange Abyssal Frost Core -->
+    <polygon points="113,32 98,20 76,20 56,16 68,25 50,29 60,32 50,35 68,39 56,48 76,44 98,44" fill="#051329" />
+    <polygon points="88,32 97,28 106,32 97,36" fill="#14457A" />
+  </g>
+
+  <!-- ==================== FRAME 3 (256 to 384) ==================== -->
+  <g transform="translate(256, 0)">
+    <!-- Detached Trailing Ice Shards -->
+    <polygon points="5,36 13,33 19,36 13,39" fill="#0088FF" />
+    <polygon points="14,11 20,8 25,11 20,14" fill="#0088FF" />
+    <polygon points="17,49 25,46 31,49 25,52" fill="#33CCFF" />
+
+    <!-- Outer Deep Freeze Body -->
+    <polygon points="124,32 106,13 72,10 52,8 62,17 28,12 48,24 8,32 48,40 28,52 62,47 52,56 72,54 106,51" fill="#0066CC" />
+    
+    <!-- Mid Cyan Glacier Layer -->
+    <polygon points="119,32 102,16 74,14 58,14 68,21 42,18 58,27 24,32 58,37 42,46 68,43 58,50 74,50 102,48" fill="#00CCFF" />
+
+    <!-- White-Cyan Frost Highlight -->
+    <use href="#ice-core-base" />
+
+    <!-- Strange Abyssal Frost Core -->
+    <polygon points="113,32 98,22 76,22 62,20 72,27 42,26 66,32 42,38 72,37 62,44 76,42 98,42" fill="#051329" />
+    <polygon points="91,32 99,26 108,32 99,38" fill="#14457A" />
+  </g>
+
+  <!-- ==================== FRAME 4 (384 to 512) ==================== -->
+  <g transform="translate(384, 0)">
+    <!-- Detached Trailing Ice Shards -->
+    <polygon points="4,19 11,16 17,19 11,22" fill="#33CCFF" />
+    <polygon points="9,50 16,47 21,50 16,53" fill="#0088FF" />
+    <polygon points="18,28 26,25 32,28 26,31" fill="#0088FF" />
+
+    <!-- Outer Deep Freeze Body -->
+    <polygon points="124,32 106,14 72,11 45,6 58,16 21,16 44,26 14,32 44,38 21,48 58,48 45,58 72,53 106,50" fill="#0066CC" />
+    
+    <!-- Mid Cyan Glacier Layer -->
+    <polygon points="119,32 102,17 74,15 54,12 64,20 35,21 54,28 31,32 54,36 35,43 64,44 54,52 74,49 102,47" fill="#00CCFF" />
+
+    <!-- White-Cyan Frost Highlight -->
+    <use href="#ice-core-base" />
+
+    <!-- Strange Abyssal Frost Core -->
+    <polygon points="113,32 98,21 76,21 58,17 69,26 48,28 62,32 48,36 69,38 58,47 76,43 98,43" fill="#051329" />
+    <polygon points="89,32 98,27.5 107,32 98,36.5" fill="#14457A" />
+  </g>
+</svg>
