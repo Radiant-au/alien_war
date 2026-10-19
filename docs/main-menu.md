@@ -1,8 +1,8 @@
 # Alien War main menu
 
-Startup now presents a lightweight flat menu before importing Phaser. New Game starts a fresh 2-, 3- or 4-player local match. The chosen Scout, Hopper, Stinger or Orbit becomes Player 1; the other ships remain unique. Menu portraits use the same shapes and colors as the battlefield ships. The battle Menu button pauses play and exposes Continue. New Game discards the previous match.
+Opening the game immediately shows the poster loading screen. It downloads the runtime artwork, weapon assets and intro music, initializes Phaser, and pauses the ready arena before showing the menu. The opening screen remains visible for at least 20 seconds; slower downloads extend it until ready. Asset progress is shown separately from the minimum presentation wait. New Game starts a fresh 2-, 3- or 4-player local match. The chosen Scout, Hopper, Stinger or Orbit becomes Player 1; the other ships remain unique. Menu portraits use the same shapes and colors as the battlefield ships. The battle Menu button pauses play and exposes Continue. New Game discards the previous match.
 
-Options provides a sound switch, music volume and effects volume. Preferences persist in local storage when available. Original quiet synthesized music, menu clicks and a firing cue use Web Audio after a user gesture; sound stops while the page is hidden. Audio availability does not gate gameplay. Exit pauses sound and explains that a browser tab can be closed; Back to Menu returns to the menu.
+Options provides a sound switch, music volume and effects volume. Preferences persist in local storage when available. The existing intro.mp3 plays only on the opening loader and stops when the menu appears. A Tap for music button handles browser autoplay restrictions. Menu clicks and firing cues remain separate sound effects; music and effects respect saved settings and page visibility. Audio availability does not gate gameplay. Exit pauses sound and explains that a browser tab can be closed; Back to Menu returns to the menu.
 
 ## Loading fix
 

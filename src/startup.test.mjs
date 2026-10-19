@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { startupSignal, withDeadline } from './startup.ts'
+import { startupSignal, withDeadline, remainingLoadingTime } from './startup.ts'
 import { normalizePreferences, shipOrder } from './preferences.ts'
 
 test('startup readiness survives completion before the importing caller subscribes', async () => {
@@ -22,4 +22,11 @@ test('preferences clamp damaged storage and selected ship orders preserve four u
     assert.equal(order[0], ship)
     assert.deepEqual([...order].sort(), [0,1,2,3])
   }
+})
+
+test('opening loader enforces 20 seconds on cache hits and adds no delay after slow downloads', () => {
+  assert.equal(remainingLoadingTime(1000,1000),20000)
+  assert.equal(remainingLoadingTime(1000,6000),15000)
+  assert.equal(remainingLoadingTime(1000,21000),0)
+  assert.equal(remainingLoadingTime(1000,26000),0)
 })
