@@ -44,8 +44,8 @@ export function overviewScrollX(players: Player[], zoom = overviewZoom(players),
   return Math.max(0, Math.min(WORLD_WIDTH - visibleWidth, midpoint - visibleWidth / 2))
 }
 
-export function createMatch(seed = 0x51a7, count = 2): Match {
-  const terrain = createTerrain(seed, count)
+export function createMatch(seed = 0x51a7, count = 2, variant?: number): Match {
+  const terrain = createTerrain(seed, count, variant)
   const players = createPlayers(terrain, count)
   return {
     viewWidth: VIEW_WIDTH,
@@ -177,4 +177,5 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
   }
   stepCamera(match, dt)
 }
+
 

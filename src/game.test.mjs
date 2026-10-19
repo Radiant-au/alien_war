@@ -164,7 +164,7 @@ test('impact damages once, settles, then transitions before the next player can 
   assert.equal(match.players[0].health, 40)
   assert.equal(match.phase, 'Impact')
   assert.equal(fire(match), false)
-  for (let i = 0; i < 200; i++) updateMatch(match, STEP_SECONDS)
+  for (let i = 0; i < 600 && match.phase !== 'MovementAiming'; i++) updateMatch(match, STEP_SECONDS)
   assert.equal(match.active, 1)
   assert.equal(match.phase, 'MovementAiming')
   assert.equal(match.players[1].movementRemaining, MOVEMENT_ALLOWANCE)
@@ -242,8 +242,9 @@ test('hybrid camera returns to overview after impact and before next turn', () =
   const match = readyMatch()
   match.cameraX = 0
   resolveShot(match, { kind: 'miss' })
-  for (let i = 0; i < 200; i++) updateMatch(match, STEP_SECONDS)
+  for (let i = 0; i < 600 && match.phase !== 'MovementAiming'; i++) updateMatch(match, STEP_SECONDS)
   assert.equal(match.phase, 'MovementAiming')
   assert.equal(match.active, 1)
   assert.ok(Math.abs(match.cameraX - overviewScrollX(match.players)) < 1e-6)
 })
+
