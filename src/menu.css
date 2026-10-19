@@ -17,7 +17,7 @@
 .hover-rings{height:16px;width:180px;border:3px solid #69f1df;border-radius:50%;margin:0 auto 32px;opacity:.8}
 .menu-selection h2{font-size:14px;letter-spacing:.16em;color:#70f7ed;margin:0 0 14px}
 .ship-picker{display:flex;justify-content:center;gap:28px;align-items:center;margin-bottom:16px}
-.ship-picker strong{font-size:27px;text-transform:uppercase;min-width:130px}.ship-picker button{border:2px solid #3bd5ed;background:#0d2047;color:#70f7ed;border-radius:10px;font-size:22px;width:44px;height:42px;cursor:pointer}
+.ship-picker strong{font-size:27px;text-transform:uppercase;min-width:130px}.ship-picker button{border:2px solid #3bd5ed;background:#0d2047;color:#70f7ed;border-radius:12px;font-size:30px;width:60px;height:56px;cursor:pointer;box-shadow:0 3px 0 #07132c}
 .ship-choices{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .ship-choices button{min-width:0;border:2px solid #5579a2;border-radius:13px;background:#11264ad9;color:#c3e6ff;padding:8px 3px;cursor:pointer}
 .ship-choices svg{display:block;width:100%;height:66px}.ship-choices span{display:block;text-transform:uppercase;font-size:11px;font-weight:800;margin-top:3px}
@@ -36,5 +36,5 @@
 #exit-dialog p{font-size:14px;line-height:1.6}#exit-dialog .menu-button{font-size:15px}
 @keyframes menu-hover{50%{transform:translateY(-7px)}}
 @media(max-width:650px){.menu-layout{grid-template-columns:1fr;gap:28px;padding:28px 22px;min-height:100dvh}.menu-navigation{max-width:420px;margin:auto;gap:10px}.menu-title{font-size:56px;display:flex;justify-content:center;gap:12px;margin-bottom:10px}.menu-button{font-size:18px;padding:12px}#hero-ship{height:150px;max-width:270px}.hover-rings{margin-bottom:22px}.menu-selection{max-width:440px;width:100%;margin:auto}.menu-note{margin-bottom:12px}.ship-choices svg{height:52px}.ship-choices span{font-size:9px}}
-@media(max-height:480px) and (min-width:651px){.menu-layout{padding:18px 5vw;gap:5vw}.menu-title{font-size:54px;margin-bottom:8px}.menu-navigation{gap:10px}.menu-button{padding:10px;font-size:17px}#hero-ship{height:120px;max-width:240px}.hover-rings{margin-bottom:14px;height:10px;width:120px}.menu-selection h2{font-size:10px;margin-bottom:8px}.ship-picker{margin-bottom:10px}.ship-picker strong{font-size:20px}.ship-picker button{width:32px;height:30px;font-size:16px}.ship-choices svg{height:38px}.local-players{margin-top:10px}.menu-note{font-size:9px;margin-top:7px}}
+@media(max-height:480px) and (min-width:651px){.menu-layout{padding:18px 5vw;gap:5vw}.menu-title{font-size:54px;margin-bottom:8px}.menu-navigation{gap:10px}.menu-button{padding:10px;font-size:17px}#hero-ship{height:120px;max-width:240px}.hover-rings{margin-bottom:14px;height:10px;width:120px}.menu-selection h2{font-size:10px;margin-bottom:8px}.ship-picker{margin-bottom:10px}.ship-picker strong{font-size:20px}.ship-picker button{width:48px;height:48px;font-size:24px}.ship-choices svg{height:38px}.local-players{margin-top:10px}.menu-note{font-size:9px;margin-top:7px}}
 @media(prefers-reduced-motion:reduce){#hero-ship{animation:none}.menu-button{transform:none}}

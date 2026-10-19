@@ -138,7 +138,7 @@ get('#exit-game').addEventListener('click',()=>{audio.stop();exitDialog.showModa
 get('#stay-game').addEventListener('click',()=>{exitDialog.close();audio.unlock();audio.setScene('menu')})
 get('#previous-ship').addEventListener('click',()=>selectShip((settings.ship+3)%4))
 get('#next-ship').addEventListener('click',()=>selectShip((settings.ship+1)%4))
-function selectShip(index:number) { settings.ship=index;updateSelection();audio.unlock();audio.click() }
+function selectShip(index:number) { settings.ship=index;updateSelection();audio.unlock();audio.character() }
 menu.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(button=>button.addEventListener('click',()=>selectShip(Number(button.dataset.ship))))
 get<HTMLSelectElement>('#menu-players').addEventListener('change',event=>{settings.players=Number((event.target as HTMLSelectElement).value);savePreferences(settings)})
 get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.target as HTMLInputElement).checked;audio.unlock();updateAudio();audio.click()})
@@ -150,8 +150,6 @@ updateSelection();updateAudio()
 menu.hidden=true;menu.inert=true;app.inert=true
 overlay.setAttribute('aria-busy','false')
 progress(0,'Tap to begin')
-// Only the poster is shown before consent; the real gesture starts audio and the
-// 15-second timer together. Do not await anything before audio.unlock().
 void Promise.all([artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)])
 get('#loading-music').addEventListener('click',()=>{
   if(introStarted)return
@@ -160,6 +158,7 @@ get('#loading-music').addEventListener('click',()=>{
   audio.setScene('loading')
   audio.unlock()
   get('#loading-music').hidden=true
+  get('.loading-panel').hidden=false
   overlay.setAttribute('aria-busy','true')
   void loadOpening()
 })
@@ -181,7 +180,8 @@ async function loadOpening(){
   try {
     progress(1,'Downloading assets...')
     const animateProgress=(now:number)=>{
-      const value=Math.min(99,1+(now-openedAt)/loadingDuration*98)
+      const elapsed=(now-openedAt)/loadingDuration
+      const value=Math.min(99,1+elapsed*98)
       const message=assetsReady?`Preparing launch · ${Math.ceil(Math.max(0,loadingDuration-(now-openedAt))/1000)}s`:status.textContent||'Loading assets...'
       progress(value,message)
       if(value<99)progressFrame=requestAnimationFrame(animateProgress)

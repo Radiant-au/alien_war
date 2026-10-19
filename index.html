@@ -12,13 +12,13 @@
     <section id="loading-screen" aria-label="Alien War loading screen" aria-busy="true">
       <img id="loading-background" class="loading-background" alt="" />
       <img id="loading-logo" class="loading-logo" alt="Alien War" />
-      <div class="loading-panel">
+      <button id="loading-music" type="button">▶<span>TAP TO BEGIN</span></button>
+      <div class="loading-panel" hidden>
         <p id="loading-status" role="status">Tap to begin</p>
         <div class="loading-progress-row">
           <div id="loading-progress" role="progressbar" aria-label="Game loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loading-fill"></i></div>
           <output id="loading-percent">0%</output>
         </div>
-        <button id="loading-music" type="button">▶ Tap to begin</button>
         <button id="loading-retry" hidden>Retry loading</button>
         <button id="loading-back" hidden>Back to menu</button>
       </div>
