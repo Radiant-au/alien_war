@@ -3,8 +3,9 @@ import introTrack from '../assets/music/intro.mp3?url'
 import menuTrack from '../assets/music/main_menu.mp3?url'
 import shootSound from '../assets/Sfx/shoot.mp3?url'
 import electricSound from '../assets/Sfx/electric.ogg?url'
+import poisonSound from '../assets/Sfx/poison.ogg?url'
 
-export const SFX_ASSETS = [shootSound, electricSound]
+export const SFX_ASSETS = [shootSound, electricSound, poisonSound]
 
 /** Shared music and lightweight synth sound effects. */
 export class GameAudio {
@@ -16,8 +17,9 @@ export class GameAudio {
   private samples = {
     shot: Array.from({length:4},()=>new Audio(shootSound)),
     electric: Array.from({length:2},()=>new Audio(electricSound)),
+    poison: Array.from({length:2},()=>new Audio(poisonSound)),
   }
-  private sampleIndex = {shot:0,electric:0}
+  private sampleIndex = {shot:0,electric:0,poison:0}
   private active = false
   private settings: Preferences
   constructor(settings: Preferences) {
@@ -77,7 +79,7 @@ export class GameAudio {
   private stopSamples() {
     for(const pool of Object.values(this.samples))for(const sample of pool){sample.pause();sample.currentTime=0}
   }
-  private playSample(kind:'shot'|'electric') {
+  private playSample(kind:'shot'|'electric'|'poison') {
     if(!this.active||!this.settings.sound||this.settings.sfx<=0||document.hidden||this.scene!=='battle')return
     const pool=this.samples[kind],sample=pool[this.sampleIndex[kind]++%pool.length]
     sample.pause();sample.currentTime=0;sample.volume=this.settings.sfx/100
@@ -85,6 +87,7 @@ export class GameAudio {
   }
   shot() { this.playSample('shot') }
   electricImpact() { this.playSample('electric') }
+  poisonImpact() { this.playSample('poison') }
 }
 
 

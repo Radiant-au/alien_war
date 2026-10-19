@@ -73,7 +73,11 @@ export function fire(match: Match): boolean {
 }
 
 export function resolveShot(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean } = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
-  match.shot = undefined
+  applyShotResult(match,result,blast)
+  finishShot(match)
+}
+
+export function applyShotResult(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean }): void {
   match.impactX = result.kind === 'impact' ? result.x : undefined
   if (result.kind === 'impact') {
     const radius = blast.radius
@@ -88,6 +92,10 @@ export function resolveShot(match: Match, result: TerminalResult, blast: { radiu
       }
     }
   }
+}
+
+export function finishShot(match: Match): void {
+  match.shot = undefined
   match.phase = 'Impact'
 }
 

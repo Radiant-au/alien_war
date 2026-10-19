@@ -1,8 +1,8 @@
 import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from './aim.ts'
 import { WORLD_WIDTH } from './config.ts'
-import { createMatch, fire, overviewScrollX, overviewZoom, resolveShot, updateMatch, type Match } from './match.ts'
-import { createShot, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory } from './projectile.ts'
+import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, type Match } from './match.ts'
+import { createShot, createSpreadShots, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory, type Shot } from './projectile.ts'
 import { surfaceAt, type Player } from './terrain.ts'
 import { SPELLS, type Spell } from './spells.ts'
 import { drawShip, SHIPS } from './ships.ts'
@@ -38,7 +38,8 @@ export class LandscapeScene extends Phaser.Scene {
   private crystals:Crystal[]=[]
   private burningUntil=new Map<number,number>()
   private particles:Phaser.GameObjects.GameObject[]=[]
-  private missile?:Phaser.GameObjects.Sprite
+  private volleyShots:Shot[]=[]
+  private volleyMissiles:Phaser.GameObjects.Sprite[]=[]
   private terrainAnchors=new Map<Phaser.GameObjects.GameObject,{x:number;offsetY:number}>()
   private terrainPatches:TerrainPatch[]=[]
   private revision=-1
@@ -150,9 +151,10 @@ export class LandscapeScene extends Phaser.Scene {
     const shooter=this.match.players[this.match.active]
     this.recoil.set(shooter.id,{time:this.elapsed,angle:shooter.aimAngle,power:shooter.power})
     this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()
-    const shot=this.match.shot!,texture=MISSILE_TEXTURES[this.shotSpell.effect]
-    this.missile=this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5)
-    this.missile.play(`missile-${this.shotSpell.effect}-travel`)
+    this.volleyShots=this.shotSpell.effect==='electric'?createSpreadShots(shooter):[this.match.shot!]
+    this.match.shot=this.volleyShots[Math.floor(this.volleyShots.length/2)]
+    const texture=MISSILE_TEXTURES[this.shotSpell.effect]
+    this.volleyMissiles=this.volleyShots.map(shot=>this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5).play(`missile-${this.shotSpell.effect}-travel`))
     this.syncMissile()
   }
   restart(count=this.match.players.length){
@@ -263,9 +265,18 @@ export class LandscapeScene extends Phaser.Scene {
     const axis=this.match.pointerId!==undefined||left===right?0:left?-1:1
     const beforePhase=this.match.phase
     while(this.stepAccumulator>=STEP_SECONDS){
-      if(this.match.phase==='ProjectileFlight'&&this.match.shot){
-        const result=stepShot(this.match.shot,this.match.terrain,this.match.players,STEP_SECONDS*PROJECTILE_SPEED_MULTIPLIER)
-        if(result){resolveShot(this.match,result,this.shotSpell);if(result.kind==='impact')this.impact(result.x,this.shotSpell,result.target);this.trail=[];this.clearMissile()}
+      if(this.match.phase==='ProjectileFlight'&&this.volleyShots.length){
+        for(let i=this.volleyShots.length-1;i>=0;i--){
+          const result=stepShot(this.volleyShots[i],this.match.terrain,this.match.players,STEP_SECONDS*PROJECTILE_SPEED_MULTIPLIER)
+          if(!result)continue
+          if(result.kind==='impact'){
+            const blast=this.shotSpell.effect==='electric'?{...this.shotSpell,damage:this.shotSpell.damage/3}:this.shotSpell
+            applyShotResult(this.match,result,blast);this.impact(result.x,this.shotSpell,result.target)
+          }
+          this.volleyShots.splice(i,1);this.volleyMissiles.splice(i,1)[0]?.destroy()
+        }
+        if(this.volleyShots.length)this.match.shot=this.volleyShots[0]
+        else {finishShot(this.match);this.trail=[];this.clearMissile()}
       }
       updateMatch(this.match,STEP_SECONDS,axis);this.stepAccumulator-=STEP_SECONDS
     }
@@ -344,11 +355,9 @@ export class LandscapeScene extends Phaser.Scene {
     }
   }
   private syncMissile(){
-    const shot=this.match.shot
-    if(!shot){this.clearMissile();return}
-    if(this.missile?.active)this.missile.setPosition(shot.x,shot.y).setRotation(Math.atan2(shot.vy,shot.vx))
+    this.volleyShots.forEach((shot,i)=>this.volleyMissiles[i]?.setPosition(shot.x,shot.y).setRotation(Math.atan2(shot.vy,shot.vx)))
   }
-  private clearMissile(){this.missile?.destroy();this.missile=undefined}
+  private clearMissile(){for(const missile of this.volleyMissiles)missile.destroy();this.volleyMissiles=[];this.volleyShots=[]}
   private impact(x:number,spell:Spell,target:'terrain'|number){
     if(spell.effect==='fire'&&target!=='terrain'&&this.match.players[target]?.health>0)this.burningUntil.set(target,this.elapsed+2.4)
     if(!this.reducedMotion)this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
@@ -367,7 +376,7 @@ export class LandscapeScene extends Phaser.Scene {
       fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15});fire.chain(['fire-impact-burn','fire-impact-fade'])
       if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xff8a2b,radius)
     }else if(spell.effect==='electric'){
-      if(target==='terrain')window.dispatchEvent(new Event('alien-war-electric-impact'))
+      window.dispatchEvent(new Event('alien-war-electric-impact'))
       const pulse=this.add.sprite(x,groundY-radius*.25,'electric-impact').setDisplaySize(radius*2.7,radius*2.7).setDepth(depth)
       this.anchorToTerrain(pulse,x,-radius*.25)
       this.trackEffect(pulse);pulse.once(Phaser.Animations.Events.ANIMATION_COMPLETE,()=>this.removeEffect(pulse));pulse.play({key:'electric-impact-animation',frameRate:this.reducedMotion?30:18})
@@ -375,6 +384,7 @@ export class LandscapeScene extends Phaser.Scene {
       this.animateEffect(scorch,{alpha:0,scale:.85,duration:this.reducedMotion?300:1100})
       if(!this.reducedMotion)for(let i=0;i<7;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0x6ffaff,radius*.8)
     }else if(spell.effect==='poison'){
+      window.dispatchEvent(new Event('alien-war-poison-impact'))
       const puddle=this.surfacePatch(x,groundY,radius*1.3,0x1d3a12,.96,0x39ff14,1,4,20,true).setDepth(depth)
       this.animateEffect(puddle,{alpha:0,scale:.94,duration:this.reducedMotion?500:4800,delay:this.reducedMotion?0:2500})
       if(!this.reducedMotion)for(let i=0;i<20;i++){

@@ -42,6 +42,7 @@ export function playerStarts(count = 2): readonly number[] {
 }
 
 export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
+  const starts = playerStarts(playerCount);
   let state = seed >>> 0;
   const random = () => {
     state = (state * 1664525 + 1013904223) >>> 0;
@@ -63,9 +64,10 @@ export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
     // Keep ramps angular, while the two deep basins have gently rounded floors.
     const rounded = (u > .275 && u < .35) || (u > .635 && u < .70);
     const blend = rounded ? t * t * (3 - 2 * t) : t;
-    return (a[1] + (b[1] - a[1]) * blend) * WORLD_HEIGHT + variation;
+    const profile = (playerCount - 2) * .018 * Math.sin(u * Math.PI * (playerCount + 4));
+    return (a[1] + (b[1] - a[1]) * blend + profile) * WORLD_HEIGHT + variation;
   });
-  for (const fraction of playerStarts(playerCount)) {
+  for (const fraction of starts) {
     const center = Math.round(WORLD_WIDTH * fraction), ground = heights[center];
     const radius = PLAYER_WIDTH * 2;
     for (let x = Math.max(0, center - radius); x <= Math.min(WORLD_WIDTH, center + radius); x++) {

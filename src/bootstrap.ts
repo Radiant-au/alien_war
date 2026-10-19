@@ -146,6 +146,7 @@ get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.ta
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
 window.addEventListener('alien-war-shot',()=>audio.shot())
 window.addEventListener('alien-war-electric-impact',()=>audio.electricImpact())
+window.addEventListener('alien-war-poison-impact',()=>audio.poisonImpact())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
 get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMenu()})
 updateSelection();updateAudio()
@@ -184,7 +185,7 @@ async function loadOpening(){
     const animateProgress=(now:number)=>{
       const elapsed=(now-openedAt)/loadingDuration
       const value=Math.min(99,1+elapsed*98)
-      const message=assetsReady?`Preparing launch · ${Math.ceil(Math.max(0,loadingDuration-(now-openedAt))/1000)}s`:status.textContent||'Loading assets...'
+      const message=assetsReady?'Preparing launch...':status.textContent||'Loading assets...'
       progress(value,message)
       if(value<99)progressFrame=requestAnimationFrame(animateProgress)
     }

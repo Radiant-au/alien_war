@@ -38,6 +38,10 @@ export function createShot(player: Player): Shot {
   }
 }
 
+export function createSpreadShots(player: Player, spread = Math.PI / 24): Shot[] {
+  return [-spread, 0, spread].map(offset => createShot({...player, aimAngle: player.aimAngle + offset}))
+}
+
 function segmentBoxHit(x0: number, y0: number, x1: number, y1: number, player: Player): number | undefined {
   const minX = player.x - PLAYER_WIDTH / 2 - PROJECTILE_RADIUS
   const maxX = player.x + PLAYER_WIDTH / 2 + PROJECTILE_RADIUS
