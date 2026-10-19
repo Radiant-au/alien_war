@@ -6,7 +6,7 @@ import { createShot, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajec
 import { surfaceAt, type Player } from './terrain.ts'
 import { SPELLS, type Spell } from './spells.ts'
 import { drawShip, SHIPS } from './ships.ts'
-import { shipPose } from './ship-motion.ts'
+import { shipPose, shotRecoil } from './ship-motion.ts'
 
 export interface BattleHud {
   match:Match; spell:number
@@ -42,6 +42,7 @@ export class LandscapeScene extends Phaser.Scene {
   private terrainAnchors=new Map<Phaser.GameObjects.GameObject,{x:number;offsetY:number}>()
   private terrainPatches:TerrainPatch[]=[]
   private revision=-1
+  private recoil=new Map<number,{time:number;angle:number;power:number}>()
   private elapsed=0
   private stepAccumulator=0
   private moving:boolean[]=[]
@@ -146,6 +147,8 @@ export class LandscapeScene extends Phaser.Scene {
     if(!this.gameplayEnabled)return
     if(!fire(this.match))return
     window.dispatchEvent(new Event('alien-war-shot'))
+    const shooter=this.match.players[this.match.active]
+    this.recoil.set(shooter.id,{time:this.elapsed,angle:shooter.aimAngle,power:shooter.power})
     this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()
     const shot=this.match.shot!,texture=MISSILE_TEXTURES[this.shotSpell.effect]
     this.missile=this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5)
@@ -153,7 +156,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.syncMissile()
   }
   restart(count=this.match.players.length){
-    this.clearInputs();this.clearMissile();this.burningUntil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
+    this.clearInputs();this.clearMissile();this.burningUntil.clear();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
     this.previousX=this.match.players.map(p=>p.x);for(const p of this.particles){this.tweens.killTweensOf(p);p.destroy()}this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     if(this.actors){this.generateCrystals();this.drawTerrain();this.resizeView()}
   }
@@ -303,7 +306,10 @@ export class LandscapeScene extends Phaser.Scene {
       g.fillStyle(color,this.reducedMotion?.16:.16+Math.sin(this.elapsed*4+kind)*.08)
       g.fillEllipse(pose.x,pose.y+18,42,13)
     }
-    g.save();g.translateCanvas(pose.x,pose.y);g.rotateCanvas(tilt);g.scaleCanvas(dir*1.5,1.5)
+    const fired=this.recoil.get(player.id)
+    const recoil=fired?shotRecoil(this.elapsed-fired.time,fired.angle,fired.power,this.reducedMotion):{x:0,y:0,angle:0}
+    if(fired&&this.elapsed-fired.time>=.65)this.recoil.delete(player.id)
+    g.save();g.translateCanvas(pose.x+recoil.x,pose.y+recoil.y);g.rotateCanvas(tilt+recoil.angle);g.scaleCanvas(dir*1.5,1.5)
     const thrust=this.moving[kind]&&!this.reducedMotion?.5+Math.sin(this.elapsed*18)*.25:0
     drawShip(g,kind,thrust);g.restore()
     if((this.burningUntil.get(kind)??0)>this.elapsed){
@@ -314,7 +320,7 @@ export class LandscapeScene extends Phaser.Scene {
       g.fillTriangle(pose.x+7,top+20,pose.x+12,top+4-flicker*2,pose.x+16,top+19)
     }
     // The weapon keeps the world-space aim angle while the hull follows the slope.
-    g.save();g.translateCanvas(player.x,pose.y+4);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.3,1.3)
+    g.save();g.translateCanvas(player.x+recoil.x,pose.y+4+recoil.y);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.3,1.3)
     g.fillStyle(0x172941);g.fillRoundedRect(5,-4,24,8,3)
     g.fillStyle(color);g.fillRect(9,-2,21,4);g.fillStyle(0xdfffff);g.fillEllipse(29,0,3,7)
     g.restore()
@@ -361,6 +367,7 @@ export class LandscapeScene extends Phaser.Scene {
       fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15});fire.chain(['fire-impact-burn','fire-impact-fade'])
       if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xff8a2b,radius)
     }else if(spell.effect==='electric'){
+      if(target==='terrain')window.dispatchEvent(new Event('alien-war-electric-impact'))
       const pulse=this.add.sprite(x,groundY-radius*.25,'electric-impact').setDisplaySize(radius*2.7,radius*2.7).setDepth(depth)
       this.anchorToTerrain(pulse,x,-radius*.25)
       this.trackEffect(pulse);pulse.once(Phaser.Animations.Events.ANIMATION_COMPLETE,()=>this.removeEffect(pulse));pulse.play({key:'electric-impact-animation',frameRate:this.reducedMotion?30:18})
@@ -426,4 +433,5 @@ export class LandscapeScene extends Phaser.Scene {
     this.trackEffect(target);this.tweens.add({targets:target,...options,onComplete:()=>this.removeEffect(target)})
   }
 }
+
 

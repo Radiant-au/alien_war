@@ -13,3 +13,11 @@ export function shipPose(terrain: Terrain, player: Player, time: number, reduced
     pulse: reducedMotion ? .3 : (time * .7 + player.id * .23) % 1,
   }
 }
+
+
+/** Damped firing impulse, applied to drawing only, never collision or trajectory. */
+export function shotRecoil(age:number,angle:number,power:number,reducedMotion=false) {
+  if(reducedMotion||!Number.isFinite(age)||age<=0||age>=.65)return {x:0,y:0,angle:0}
+  const kick=Math.sin(age*24)*Math.exp(-age*9)*(5+Math.max(0,Math.min(1,power))*6)
+  return {x:-Math.cos(angle)*kick,y:-Math.sin(angle)*kick*.3,angle:Math.cos(angle)*kick*.009}
+}

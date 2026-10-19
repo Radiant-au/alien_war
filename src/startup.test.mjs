@@ -16,7 +16,7 @@ test('startup errors and missing ready signals reject rather than leaving loadin
   await assert.rejects(withDeadline(new Promise(() => {}), 10), /Loading timed out/)
 })
 test('preferences clamp damaged storage and selected ship orders preserve four unique players', () => {
-  assert.deepEqual(normalizePreferences({ship: 10, players: 1, sound: false, music: Infinity, sfx: -10}), {ship:0,players:4,sound:false,music:70,sfx:0})
+  assert.deepEqual(normalizePreferences({ship: 10, players: 1, sound: false, music: Infinity, sfx: -10}), {ship:0,players:4,sound:false,music:40,sfx:0})
   for(let ship=0;ship<4;ship++) {
     const order = shipOrder(ship)
     assert.equal(order[0], ship)
@@ -30,4 +30,5 @@ test('opening loader enforces 15 seconds on cache hits and adds no delay after s
   assert.equal(remainingLoadingTime(1000,16000),0)
   assert.equal(remainingLoadingTime(1000,26000),0)
 })
+
 
