@@ -4,11 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a1020" />
-    <title>Crater Clash · Local Alien Artillery</title>
+    <title>Alien War · Local Alien Artillery</title>
+    <link rel="stylesheet" href="/src/loading.css" />
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <section id="loading-screen" aria-label="Alien War loading screen" aria-busy="true">
+      <img id="loading-background" class="loading-background" alt="" />
+      <img id="loading-logo" class="loading-logo" alt="Alien War" />
+      <div class="loading-panel">
+        <p id="loading-status" role="status">Preparing launch...</p>
+        <div class="loading-progress-row">
+          <div id="loading-progress" role="progressbar" aria-label="Game loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loading-fill"></i></div>
+          <output id="loading-percent">0%</output>
+        </div>
+        <button id="loading-retry" hidden>Retry loading</button>
+      </div>
+    </section>
+    <script type="module" src="/src/bootstrap.ts"></script>
   </body>
 </html>
+
 
