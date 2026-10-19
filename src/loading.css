@@ -8,7 +8,7 @@ html,body{margin:0;background:#101338}
 #loading-status{margin:0 0 12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.24em;text-shadow:0 2px 5px #060e36}
 .loading-progress-row{display:flex;align-items:center;gap:14px}
 #loading-progress{flex:1;height:16px;padding:3px;border:2px solid #53eaf9;border-radius:30px;background:#071538;box-shadow:0 0 12px #16cfff55}
-#loading-fill{display:block;width:0;height:100%;border-radius:20px;background:linear-gradient(90deg,#14cce9,#77fff0);transition:width .25s ease}
+#loading-fill{display:block;width:0;height:100%;border-radius:20px;background:linear-gradient(90deg,#14cce9,#77fff0);transition:width .06s linear}
 #loading-percent{min-width:42px;color:#82f5ff;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
 #loading-retry,#loading-back{margin-top:16px;padding:10px 24px;background:#183259;border:1px solid #53eaf9;border-radius:8px;color:white;cursor:pointer}
 @media(orientation:portrait){.loading-background{object-position:50% center}.loading-logo{top:10vh;width:min(85vw,540px)}.loading-panel{bottom:8vh;width:84vw}}

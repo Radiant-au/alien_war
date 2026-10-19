@@ -18,6 +18,7 @@ let hasMatch = false
 let opening = true
 let engineReady = false
 const openedAt = performance.now()
+const loadingDuration = 20_000
 const menu = document.createElement('section')
 menu.id = 'main-menu-screen'
 menu.setAttribute('aria-label', 'Alien War main menu')
@@ -82,8 +83,8 @@ window.addEventListener('keydown', event => {
 }, true)
 function progress(value: number, message: string) {
   get('#loading-fill').style.width = `${value}%`
-  get('#loading-progress').setAttribute('aria-valuenow', String(value))
-  get('#loading-percent').textContent = `${value}%`
+  get('#loading-progress').setAttribute('aria-valuenow', String(Math.round(value)))
+  get('#loading-percent').textContent = `${Math.round(value)}%`
   status.textContent = message
 }
 async function artwork(id: string, url: string) {
@@ -93,12 +94,13 @@ async function artwork(id: string, url: string) {
 }
 function showMenu() {
   if(engineReady)engine?.pauseMatch()
+  audio.setScene('menu')
   get<HTMLButtonElement>('#continue-game').hidden = !hasMatch
   menuVisible(true)
 }
 async function newGame() {
   if(starting || opening)return
-  starting = true; audio.unlock(); audio.click()
+  starting = true; audio.unlock(); audio.setScene('battle'); audio.click()
   get<HTMLButtonElement>('#loading-retry').hidden = true
   get<HTMLButtonElement>('#loading-back').hidden = true
   overlay.hidden = false; overlay.classList.remove('leaving')
@@ -126,13 +128,13 @@ async function newGame() {
 }
 get('#new-game').addEventListener('click',()=>void newGame())
 get('#continue-game').addEventListener('click',()=>{
-  audio.unlock(); audio.click(); menuVisible(false);engine?.resumeMatch()
+  audio.unlock(); audio.setScene('battle'); audio.click(); menuVisible(false);engine?.resumeMatch()
   get('#main-menu').addEventListener('click',showMenu,{once:true})
 })
 get('#open-options').addEventListener('click',()=>{ audio.unlock(); audio.click();options.showModal() })
 get('#close-options').addEventListener('click',()=>{audio.click();options.close()})
 get('#exit-game').addEventListener('click',()=>{audio.stop();exitDialog.showModal()})
-get('#stay-game').addEventListener('click',()=>{exitDialog.close();audio.unlock()})
+get('#stay-game').addEventListener('click',()=>{exitDialog.close();audio.unlock();audio.setScene('menu')})
 get('#previous-ship').addEventListener('click',()=>selectShip((settings.ship+3)%4))
 get('#next-ship').addEventListener('click',()=>selectShip((settings.ship+1)%4))
 function selectShip(index:number) { settings.ship=index;updateSelection();audio.unlock();audio.click() }
@@ -142,7 +144,7 @@ get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.ta
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
 window.addEventListener('alien-war-shot',()=>audio.shot())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
-get('#loading-back').addEventListener('click',()=>{opening=false;audio.finishLoading();overlay.hidden=true;showMenu()})
+get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMenu()})
 updateSelection();updateAudio();audio.start()
 menu.hidden=true;menu.inert=true;app.inert=true
 get('#loading-music').addEventListener('click',()=>{
@@ -154,16 +156,25 @@ get('#loading-music').addEventListener('click',()=>{
 void (async()=>{
   let completed=0
   let failed=false
+  let assetsReady=false
+  let progressFrame=0
   const assets=[
     'fire_explosion_32_grid.png','electric_weapon_16.png',
     'ice_missile_spritesheet.svg','poison_missile_spritesheet.svg',
     'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
-    'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg','music/intro.mp3',
+    'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
   const total=assets.length+3
-  const downloaded=()=>{if(failed)return;completed++;progress(Math.round(completed/total*95),`Downloading assets · ${completed}/${total}`)}
+  const downloaded=()=>{if(failed)return;completed++;status.textContent=`Downloading assets · ${completed}/${total}`}
   try {
-    progress(0,'Downloading assets...')
+    progress(1,'Downloading assets...')
+    const animateProgress=(now:number)=>{
+      const value=Math.min(99,1+(now-openedAt)/loadingDuration*98)
+      const message=assetsReady?`Preparing launch · ${Math.ceil(Math.max(0,loadingDuration-(now-openedAt))/1000)}s`:status.textContent||'Loading assets...'
+      progress(value,message)
+      if(value<99)progressFrame=requestAnimationFrame(animateProgress)
+    }
+    progressFrame=requestAnimationFrame(animateProgress)
     const artworkTasks=[artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)].map(task=>task.then(downloaded))
     const downloadTasks=assets.map(async path=>{
       const response=await fetch(`${import.meta.env.BASE_URL}assets/${path}`,{cache:'force-cache',signal:AbortSignal.timeout(90000)})
@@ -177,15 +188,20 @@ void (async()=>{
       engine.pauseMatch();downloaded()
     })()
     await Promise.all([...artworkTasks,...downloadTasks,engineTask])
-    progress(95,'Assets ready · preparing launch...')
-    await new Promise(resolve=>window.setTimeout(resolve,remainingLoadingTime(openedAt,performance.now())))
+    assetsReady=true
+    progress(99,'Preparing launch...')
+    const remaining=remainingLoadingTime(openedAt,performance.now(),loadingDuration)
+    if(remaining>0)await new Promise(resolve=>window.setTimeout(resolve,remaining))
+    window.cancelAnimationFrame(progressFrame)
     progress(100,'Ready')
-    opening=false;audio.finishLoading()
+    await new Promise(resolve=>window.setTimeout(resolve,300))
+    opening=false;audio.setScene('menu');audio.finishLoading()
     overlay.hidden=true;overlay.setAttribute('aria-busy','false')
     get('#loading-music').hidden=true
     menu.inert=false;menuVisible(true)
   } catch(error) {
     failed=true
+    window.cancelAnimationFrame(progressFrame)
     console.error('Opening asset load failed',error)
     audio.finishLoading()
     status.textContent='Download interrupted. Retry or return to menu.'

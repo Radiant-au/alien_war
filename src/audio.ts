@@ -1,21 +1,34 @@
 import type { Preferences } from './preferences.ts'
+import introTrack from '../assets/music/intro.mp3?url'
+import menuTrack from '../assets/music/main_menu.mp3?url'
 
 /** Shared music and lightweight synth sound effects. */
 export class GameAudio {
   private context?: AudioContext
   private effectsBus?: GainNode
-  private music = new Audio('/assets/music/intro.mp3')
+  private music = new Audio(introTrack)
+  private currentTrack = introTrack
+  private scene: 'loading' | 'menu' | 'battle' = 'loading'
   private active = false
-  private loading = false
   private settings: Preferences
   constructor(settings: Preferences) {
     this.settings = settings
     this.music.loop = true
-    this.music.preload = 'auto'
+    this.music.preload = 'metadata'
     document.addEventListener('visibilitychange', () => this.sync())
   }
-  start() { this.loading = true; this.active = true; this.sync() }
-  finishLoading() { this.loading = false; this.music.pause(); this.music.currentTime = 0; this.sync() }
+  start() { this.active = true; this.sync() }
+  finishLoading() { this.sync() }
+  setScene(scene: 'loading' | 'menu' | 'battle') {
+    this.scene = scene
+    const track = scene === 'menu' ? menuTrack : introTrack
+    if (this.currentTrack !== track) {
+      this.currentTrack = track
+      this.music.src = track
+      this.music.currentTime = 0
+    }
+    this.sync()
+  }
   unlock() {
     try {
       if (!this.context) {
@@ -31,8 +44,8 @@ export class GameAudio {
   private sync() {
     const audible = this.active && this.settings.sound && !document.hidden
     if (this.effectsBus) this.effectsBus.gain.value = audible ? this.settings.sfx / 100 * .12 : 0
-    this.music.volume = this.settings.music / 100
-    if (audible && this.loading && this.settings.music > 0) void this.music.play().catch(() => {})
+    this.music.volume = this.settings.music / 100 * (this.scene === 'battle' ? .12 : 1)
+    if (audible && this.settings.music > 0) void this.music.play().catch(() => {})
     else this.music.pause()
   }
   private tone(frequency: number, duration: number, bus: GainNode, end = frequency) {
