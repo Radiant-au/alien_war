@@ -1,9 +1,10 @@
 import './menu.css'
+import './scenery.css'
 import { backgroundMarkup } from './background.ts'
 import { SHIPS, shipPortrait } from './ships.ts'
 import { readPreferences, savePreferences } from './preferences.ts'
 import { withDeadline, remainingLoadingTime } from './startup.ts'
-import { GameAudio } from './audio.ts'
+import { GameAudio, SFX_ASSETS } from './audio.ts'
 import logoUrl from '../assets/loading/alien-war-logo.png'
 import backgroundUrl from '../assets/loading/alien-war-background.png'
 
@@ -144,6 +145,7 @@ get<HTMLSelectElement>('#menu-players').addEventListener('change',event=>{settin
 get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.target as HTMLInputElement).checked;audio.unlock();updateAudio();audio.click()})
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
 window.addEventListener('alien-war-shot',()=>audio.shot())
+window.addEventListener('alien-war-electric-impact',()=>audio.electricImpact())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
 get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMenu()})
 updateSelection();updateAudio()
@@ -175,7 +177,7 @@ async function loadOpening(){
     'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
     'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
-  const total=assets.length+3
+  const total=assets.length+3+SFX_ASSETS.length
   const downloaded=()=>{if(failed)return;completed++;status.textContent=`Downloading assets · ${completed}/${total}`}
   try {
     progress(1,'Downloading assets...')
@@ -188,8 +190,9 @@ async function loadOpening(){
     }
     progressFrame=requestAnimationFrame(animateProgress)
     const artworkTasks=[artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)].map(task=>task.then(downloaded))
-    const downloadTasks=assets.map(async path=>{
-      const response=await fetch(`${import.meta.env.BASE_URL}assets/${path}`,{cache:'force-cache',signal:AbortSignal.timeout(90000)})
+    const urls=[...assets.map(path=>`${import.meta.env.BASE_URL}assets/${path}`),...SFX_ASSETS]
+    const downloadTasks=urls.map(async path=>{
+      const response=await fetch(path,{cache:'force-cache',signal:AbortSignal.timeout(90000)})
       if(!response.ok)throw new Error(`Asset download failed: ${path} (${response.status})`)
       await response.arrayBuffer();downloaded()
     })
@@ -223,4 +226,5 @@ async function loadOpening(){
     menu.inert=false
   }
 }
+
 
