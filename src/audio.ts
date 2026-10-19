@@ -30,14 +30,16 @@ export class GameAudio {
     this.sync()
   }
   unlock() {
+    this.active = true
     try {
       if (!this.context) {
         this.context = new AudioContext()
         this.effectsBus = this.context.createGain(); this.effectsBus.connect(this.context.destination)
       }
       void this.context.resume().catch(() => {})
-      this.active = true; this.sync()
-    } catch { /* Audio support is optional; the game remains playable. */ }
+    } catch { /* Synth effects are optional; music can still play. */ }
+    // Call play synchronously inside the real user gesture, even without Web Audio.
+    this.sync()
   }
   update(settings: Preferences) { this.settings = settings; this.sync() }
   stop() { this.active = false; this.sync() }
@@ -61,4 +63,5 @@ export class GameAudio {
   click() { if(this.context && this.effectsBus && this.settings.sound && this.active) this.tone(620,.08,this.effectsBus,900) }
   shot() { if(this.context && this.effectsBus && this.settings.sound && this.active) this.tone(420,.3,this.effectsBus,65) }
 }
+
 

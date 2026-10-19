@@ -17,8 +17,9 @@ let starting = false
 let hasMatch = false
 let opening = true
 let engineReady = false
-const openedAt = performance.now()
-const loadingDuration = 20_000
+let openedAt = 0
+let introStarted = false
+const loadingDuration = 15_000
 const menu = document.createElement('section')
 menu.id = 'main-menu-screen'
 menu.setAttribute('aria-label', 'Alien War main menu')
@@ -145,15 +146,26 @@ for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener
 window.addEventListener('alien-war-shot',()=>audio.shot())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
 get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMenu()})
-updateSelection();updateAudio();audio.start()
+updateSelection();updateAudio()
 menu.hidden=true;menu.inert=true;app.inert=true
+overlay.setAttribute('aria-busy','false')
+progress(0,'Tap to begin')
+// Only the poster is shown before consent; the real gesture starts audio and the
+// 15-second timer together. Do not await anything before audio.unlock().
+void Promise.all([artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)])
 get('#loading-music').addEventListener('click',()=>{
+  if(introStarted)return
+  introStarted=true
+  openedAt=performance.now()
+  audio.setScene('loading')
   audio.unlock()
-  get('#loading-music').textContent = settings.sound ? '♫ Music enabled' : 'Sound is off in Options'
+  get('#loading-music').hidden=true
+  overlay.setAttribute('aria-busy','true')
+  void loadOpening()
 })
 // The opening loader owns asset download and engine startup. Its minimum duration
 // is presentation time, never presented as additional network download progress.
-void (async()=>{
+async function loadOpening(){
   let completed=0
   let failed=false
   let assetsReady=false
@@ -189,7 +201,7 @@ void (async()=>{
     })()
     await Promise.all([...artworkTasks,...downloadTasks,engineTask])
     assetsReady=true
-    progress(99,'Preparing launch...')
+    status.textContent='Preparing launch...'
     const remaining=remainingLoadingTime(openedAt,performance.now(),loadingDuration)
     if(remaining>0)await new Promise(resolve=>window.setTimeout(resolve,remaining))
     window.cancelAnimationFrame(progressFrame)
@@ -210,4 +222,5 @@ void (async()=>{
     get<HTMLButtonElement>('#loading-back').hidden=false
     menu.inert=false
   }
-})()
+}
+

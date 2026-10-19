@@ -24,9 +24,10 @@ test('preferences clamp damaged storage and selected ship orders preserve four u
   }
 })
 
-test('opening loader enforces 20 seconds on cache hits and adds no delay after slow downloads', () => {
-  assert.equal(remainingLoadingTime(1000,1000),20000)
-  assert.equal(remainingLoadingTime(1000,6000),15000)
-  assert.equal(remainingLoadingTime(1000,21000),0)
+test('opening loader enforces 15 seconds on cache hits and adds no delay after slow downloads', () => {
+  assert.equal(remainingLoadingTime(1000,1000),15000)
+  assert.equal(remainingLoadingTime(1000,6000),10000)
+  assert.equal(remainingLoadingTime(1000,16000),0)
   assert.equal(remainingLoadingTime(1000,26000),0)
 })
+
