@@ -15,3 +15,6 @@ html,body{margin:0;background:#101338}
 @media(max-height:480px) and (orientation:landscape){.loading-logo{width:29vw;top:2vh}.loading-panel{bottom:4vh;width:42vw}#loading-status{font-size:10px;margin-bottom:8px}}
 @media(prefers-reduced-motion:reduce){#loading-screen,#loading-fill{transition:none}}
 
+
+
+#loading-music{display:block;margin:16px auto 0;padding:8px 16px;border:1px solid #69eced;border-radius:20px;background:#0b1735d9;color:#d6ffff;font:inherit;font-size:12px;cursor:pointer}#loading-music:focus-visible{outline:2px solid white;outline-offset:4px}

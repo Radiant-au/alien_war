@@ -2,7 +2,7 @@ import './menu.css'
 import { backgroundMarkup } from './background.ts'
 import { SHIPS, shipPortrait } from './ships.ts'
 import { readPreferences, savePreferences } from './preferences.ts'
-import { withDeadline } from './startup.ts'
+import { withDeadline, remainingLoadingTime } from './startup.ts'
 import { GameAudio } from './audio.ts'
 import logoUrl from '../assets/loading/alien-war-logo.png'
 import backgroundUrl from '../assets/loading/alien-war-background.png'
@@ -15,6 +15,9 @@ const audio = new GameAudio(settings)
 let engine: typeof import('./main.ts') | undefined
 let starting = false
 let hasMatch = false
+let opening = true
+let engineReady = false
+const openedAt = performance.now()
 const menu = document.createElement('section')
 menu.id = 'main-menu-screen'
 menu.setAttribute('aria-label', 'Alien War main menu')
@@ -73,7 +76,7 @@ function menuVisible(visible: boolean) {
 // Enter and range-input keyboard behavior inside the menu and native dialogs.
 window.addEventListener('keydown', event => {
   if(!menu.hidden || !overlay.hidden) {
-    if(event.key === 'Escape' && menu.hidden && !starting) showMenu()
+    if(event.key === 'Escape' && menu.hidden && !starting && !opening) showMenu()
     event.stopPropagation()
   }
 }, true)
@@ -86,15 +89,15 @@ function progress(value: number, message: string) {
 async function artwork(id: string, url: string) {
   const image = get<HTMLImageElement>(id)
   image.src = url
-  try { await withDeadline(image.decode(), 6000) } catch { image.hidden = true }
+  try { await withDeadline(image.decode(), 15000) } catch { image.hidden = true }
 }
 function showMenu() {
-  engine?.pauseMatch()
+  if(engineReady)engine?.pauseMatch()
   get<HTMLButtonElement>('#continue-game').hidden = !hasMatch
   menuVisible(true)
 }
 async function newGame() {
-  if(starting)return
+  if(starting || opening)return
   starting = true; audio.unlock(); audio.click()
   get<HTMLButtonElement>('#loading-retry').hidden = true
   get<HTMLButtonElement>('#loading-back').hidden = true
@@ -139,12 +142,56 @@ get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.ta
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
 window.addEventListener('alien-war-shot',()=>audio.shot())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
-get('#loading-back').addEventListener('click',()=>{overlay.hidden=true;showMenu()})
-updateSelection();updateAudio();audio.start();menuVisible(true)
-// Artwork failure cannot prevent the menu from becoming usable. Phaser is loaded
-// only on New Game; its event plugins are never read before initialization.
+get('#loading-back').addEventListener('click',()=>{opening=false;audio.finishLoading();overlay.hidden=true;showMenu()})
+updateSelection();updateAudio();audio.start()
+menu.hidden=true;menu.inert=true;app.inert=true
+get('#loading-music').addEventListener('click',()=>{
+  audio.unlock()
+  get('#loading-music').textContent = settings.sound ? '♫ Music enabled' : 'Sound is off in Options'
+})
+// The opening loader owns asset download and engine startup. Its minimum duration
+// is presentation time, never presented as additional network download progress.
 void (async()=>{
-  progress(5,'Loading artwork...')
-  await Promise.all([artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)])
-  if(!starting){overlay.hidden=true;overlay.setAttribute('aria-busy','false');get('#new-game').focus()}
+  let completed=0
+  let failed=false
+  const assets=[
+    'fire_explosion_32_grid.png','electric_weapon_16.png',
+    'ice_missile_spritesheet.svg','poison_missile_spritesheet.svg',
+    'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
+    'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg','music/intro.mp3',
+  ]
+  const total=assets.length+3
+  const downloaded=()=>{if(failed)return;completed++;progress(Math.round(completed/total*95),`Downloading assets · ${completed}/${total}`)}
+  try {
+    progress(0,'Downloading assets...')
+    const artworkTasks=[artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)].map(task=>task.then(downloaded))
+    const downloadTasks=assets.map(async path=>{
+      const response=await fetch(`${import.meta.env.BASE_URL}assets/${path}`,{cache:'force-cache',signal:AbortSignal.timeout(90000)})
+      if(!response.ok)throw new Error(`Asset download failed: ${path} (${response.status})`)
+      await response.arrayBuffer();downloaded()
+    })
+    const engineTask=(async()=>{
+      engine=await withDeadline(import('./main.ts'),30000)
+      await engine.gameReady
+      engineReady=true
+      engine.pauseMatch();downloaded()
+    })()
+    await Promise.all([...artworkTasks,...downloadTasks,engineTask])
+    progress(95,'Assets ready · preparing launch...')
+    await new Promise(resolve=>window.setTimeout(resolve,remainingLoadingTime(openedAt,performance.now())))
+    progress(100,'Ready')
+    opening=false;audio.finishLoading()
+    overlay.hidden=true;overlay.setAttribute('aria-busy','false')
+    get('#loading-music').hidden=true
+    menu.inert=false;menuVisible(true)
+  } catch(error) {
+    failed=true
+    console.error('Opening asset load failed',error)
+    audio.finishLoading()
+    status.textContent='Download interrupted. Retry or return to menu.'
+    overlay.setAttribute('aria-busy','false')
+    get<HTMLButtonElement>('#loading-retry').hidden=false
+    get<HTMLButtonElement>('#loading-back').hidden=false
+    menu.inert=false
+  }
 })()

@@ -18,3 +18,9 @@ export function withDeadline<T>(promise: Promise<T>, timeoutMs: number): Promise
     promise.then(value => { clearTimeout(timer); resolve(value) }, error => { clearTimeout(timer); reject(error) })
   })
 }
+
+
+/** Keep the opening screen visible for the requested minimum, even on cache hits. */
+export function remainingLoadingTime(startedAt: number, now: number, minimumMs = 20000): number {
+  return Math.max(0, minimumMs - Math.max(0, now - startedAt))
+}

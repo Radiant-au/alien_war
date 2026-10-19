@@ -6,6 +6,7 @@ export class GameAudio {
   private effectsBus?: GainNode
   private music = new Audio('/assets/music/intro.mp3')
   private active = false
+  private loading = false
   private settings: Preferences
   constructor(settings: Preferences) {
     this.settings = settings
@@ -13,7 +14,8 @@ export class GameAudio {
     this.music.preload = 'auto'
     document.addEventListener('visibilitychange', () => this.sync())
   }
-  start() { this.active = true; this.sync() }
+  start() { this.loading = true; this.active = true; this.sync() }
+  finishLoading() { this.loading = false; this.music.pause(); this.music.currentTime = 0; this.sync() }
   unlock() {
     try {
       if (!this.context) {
@@ -30,7 +32,7 @@ export class GameAudio {
     const audible = this.active && this.settings.sound && !document.hidden
     if (this.effectsBus) this.effectsBus.gain.value = audible ? this.settings.sfx / 100 * .12 : 0
     this.music.volume = this.settings.music / 100
-    if (audible && this.settings.music > 0) void this.music.play().catch(() => {})
+    if (audible && this.loading && this.settings.music > 0) void this.music.play().catch(() => {})
     else this.music.pause()
   }
   private tone(frequency: number, duration: number, bus: GainNode, end = frequency) {
@@ -46,3 +48,4 @@ export class GameAudio {
   click() { if(this.context && this.effectsBus && this.settings.sound && this.active) this.tone(620,.08,this.effectsBus,900) }
   shot() { if(this.context && this.effectsBus && this.settings.sound && this.active) this.tone(420,.3,this.effectsBus,65) }
 }
+
