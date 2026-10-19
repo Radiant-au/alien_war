@@ -22,6 +22,10 @@ const MISSILE_TEXTURES:Record<Spell['effect'],string>={
 }
 
 export class LandscapeScene extends Phaser.Scene {
+  gameplayEnabled=false
+  shipKinds=[0,1,2,3]
+  onStartupReady=()=>{}
+  onStartupError=(_error:unknown)=>{}
   match=createMatch(0x51a7,4)
   selectedSpell=0
   private shotSpell:Spell=SPELLS[0]
@@ -57,6 +61,10 @@ export class LandscapeScene extends Phaser.Scene {
     for(const type of ['ice','poison','electric','fire'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
   }
   create(){
+    try { this.createArena(); this.onStartupReady() }
+    catch(error) { this.onStartupError(error); console.error('Arena startup failed',error) }
+  }
+  private createArena(){
     if(!this.anims.exists('fire-impact-blast'))this.anims.create({key:'fire-impact-blast',frames:this.anims.generateFrameNumbers('fire-impact',{start:0,end:4}),frameRate:15,repeat:0})
     if(!this.anims.exists('fire-impact-burn'))this.anims.create({key:'fire-impact-burn',frames:this.anims.generateFrameNumbers('fire-impact',{start:5,end:23}),frameRate:8,repeat:2})
     if(!this.anims.exists('fire-impact-fade'))this.anims.create({key:'fire-impact-fade',frames:this.anims.generateFrameNumbers('fire-impact',{start:24,end:31}),frameRate:7,repeat:0})
@@ -122,6 +130,7 @@ export class LandscapeScene extends Phaser.Scene {
   private releasePointer=(e:PointerEvent)=>{this.held.delete(e.pointerId)}
   private visibility=()=>{if(document.hidden)this.clearInputs()}
   private keyDown=(event:KeyboardEvent)=>{
+    if(!this.gameplayEnabled)return
     if(event.target instanceof HTMLElement&&event.target.closest('input,select,button'))return
     if(['KeyA','KeyD','ArrowLeft','ArrowRight'].includes(event.code)){
       event.preventDefault();this.keys.add(event.code)
@@ -129,8 +138,14 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private keyUp=(event:KeyboardEvent)=>{this.keys.delete(event.code)}
   private clearInputs=()=>{this.held.clear();this.keys.clear();this.match.pointerId=undefined;this.lastAimTime=-Infinity}
+  setGameplayEnabled(enabled:boolean){
+    this.gameplayEnabled=enabled
+    if(!enabled)this.clearInputs()
+  }
   cast(){
+    if(!this.gameplayEnabled)return
     if(!fire(this.match))return
+    window.dispatchEvent(new Event('alien-war-shot'))
     this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()
     const shot=this.match.shot!,texture=MISSILE_TEXTURES[this.shotSpell.effect]
     this.missile=this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5)
@@ -273,7 +288,7 @@ export class LandscapeScene extends Phaser.Scene {
   private drawAlien(player:Player,dt:number){
     if(player.health<=0)return
     const g=this.actors,pose=shipPose(this.match.terrain,player,this.elapsed,this.reducedMotion)
-    const kind=player.id,dir=Math.cos(player.aimAngle)>=0?1:-1,color=SHIPS[kind].color
+    const kind=this.shipKinds[player.id],dir=Math.cos(player.aimAngle)>=0?1:-1,color=SHIPS[kind].color
     const previous=this.tilts[kind]??pose.angle
     const tilt=this.reducedMotion?pose.angle:previous+(pose.angle-previous)*(1-Math.exp(-dt*10))
     this.tilts[kind]=tilt
@@ -411,3 +426,4 @@ export class LandscapeScene extends Phaser.Scene {
     this.trackEffect(target);this.tweens.add({targets:target,...options,onComplete:()=>this.removeEffect(target)})
   }
 }
+

@@ -5,14 +5,15 @@ import { SPELLS } from './spells.ts'
 import { SHIPS } from './ships.ts'
 import { MOVEMENT_ALLOWANCE } from './config.ts'
 import { LandscapeScene } from './landscape-scene.ts'
+import { startupSignal } from './startup.ts'
+import { shipOrder } from './preferences.ts'
 
-const spells = SPELLS.map(spell => spell.name)
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien artillery battlefield"></main>
 <header class="hud" data-count="4">
 ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="player-name" title="${ship.name}">P${i+1}</span><div class="health-track" role="progressbar" aria-label="${ship.name} health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-${i}-bar"></i></div><strong id="health-${i}">100</strong></div>`).join('')}
-<div class="brand"><h1><span>Crater</span><br><b>Clash</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
-<nav class="utilities" aria-label="Match options"><label for="player-count">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
+<div class="brand"><h1><span>Alien</span><br><b>War</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
+<nav class="utilities" aria-label="Match options"><label for="player-count">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="main-menu">☰ Menu</button><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
 <section class="field-controls" aria-label="Battlefield controls">
   <button id="aim-wheel" aria-label="Drag aim wheel: farther increases power; direction changes angle. Arrow keys adjust; X reverses." title="Drag the wheel: direction = angle, distance = power. ↑ ↓ angle, ← → power, X reverse."><span class="wheel-disc"><span class="wheel-face"><span class="wheel-needle"></span><span class="wheel-knob"></span><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="1"/><path d="M24 8v8m0 16v8M8 24h8m16 0h8" stroke="currentColor" stroke-width="1.5"/></svg></span></span><span class="wheel-caption">DRAG AIM</span></button>
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
@@ -26,6 +27,10 @@ const commandBar=document.querySelector<HTMLElement>('.command-bar')!
 new ResizeObserver(()=>app.style.setProperty('--command-height',`${commandBar.getBoundingClientRect().height}px`)).observe(commandBar)
 
 export const scene = new LandscapeScene()
+const startup=startupSignal()
+export const gameReady=startup.promise
+scene.onStartupReady=startup.ready
+scene.onStartupError=startup.fail
 new Phaser.Game({ type: Phaser.CANVAS, parent:'game-area', transparent:true, scale:{mode:Phaser.Scale.RESIZE,width:window.innerWidth,height:window.innerHeight},scene:[scene] })
 for (const button of document.querySelectorAll<HTMLButtonElement>('.spell')) {
   button.addEventListener('click',()=>scene.selectSpell(Number(button.dataset.spell)))
@@ -76,7 +81,7 @@ let healthAnimationTime=performance.now()
 scene.setHud(({match,spell,aimFeedback})=>{
   const now=performance.now(),healthTicks=now-healthAnimationTime>=24?1:0
   if(healthTicks)healthAnimationTime=now
-  const ready=match.phase==='MovementAiming',player=match.players[match.active]
+  const ready=scene.gameplayEnabled&&match.phase==='MovementAiming',player=match.players[match.active]
   if(!ready&&aimPointer!==undefined)resetWheel()
   aimWheel.disabled=!ready
   aimWheel.style.setProperty('--wheel-progress',`${player.power*360}deg`)
@@ -95,13 +100,16 @@ scene.setHud(({match,spell,aimFeedback})=>{
   document.querySelectorAll<HTMLButtonElement>('.spell').forEach((button,i)=>{button.disabled=!ready;button.classList.toggle('selected',i===spell);button.setAttribute('aria-pressed',String(i===spell))})
   document.querySelector<HTMLElement>('.hud')!.dataset.count=String(match.players.length)
   document.querySelectorAll<HTMLElement>('.health-card').forEach((card,i)=>{
+    const ship=SHIPS[scene.shipKinds[i]]
+    card.style.setProperty('--ship-color','#'+ship.color.toString(16))
+    card.querySelector('.player-name')!.setAttribute('title',ship.name)
     const p=match.players[i];card.hidden=!p
     if(!p)return
     if(p.health>displayedHealth[i])displayedHealth[i]=p.health
     else if(healthTicks>0&&p.health<displayedHealth[i])displayedHealth[i]=Math.max(p.health,displayedHealth[i]-healthTicks)
     const shownHealth=displayedHealth[i]
     document.querySelector(`#health-${i}`)!.textContent=String(shownHealth)
-    card.title=p.health>0?`${SHIPS[i].name}: ${shownHealth} health`:`${SHIPS[i].name}: eliminated`
+    card.title=p.health>0?`${SHIPS[scene.shipKinds[i]].name}: ${shownHealth} health`:`${SHIPS[scene.shipKinds[i]].name}: eliminated`
     document.querySelector<HTMLElement>(`#health-${i}-bar`)!.style.width=`${shownHealth}%`
     card.querySelector('.health-track')!.setAttribute('aria-valuenow',String(shownHealth))
     card.classList.toggle('active',match.active===i&&ready);card.classList.toggle('eliminated',p.health<=0)
@@ -110,10 +118,24 @@ scene.setHud(({match,spell,aimFeedback})=>{
   document.querySelector('#fuel-value')!.textContent=`${Math.round(fuel)}%`
   document.querySelector<HTMLElement>('#fuel-fill')!.style.width=`${fuel}%`
   document.querySelector('#fuel-meter')!.setAttribute('aria-valuenow',String(Math.round(fuel)))
-  document.querySelector<HTMLElement>('.movement-controls')!.style.setProperty('--fuel-color','#'+SHIPS[player.id].color.toString(16))
+  document.querySelector<HTMLElement>('.movement-controls')!.style.setProperty('--fuel-color','#'+SHIPS[scene.shipKinds[player.id]].color.toString(16))
   const winner=match.outcome?.match(/^Player (\d+) wins$/)
-  const result=winner?`${SHIPS[Number(winner[1])-1].name} wins!`:match.outcome
-  document.querySelector('#turn-status')!.textContent=result??(ready?`P${player.id+1} · ${SHIPS[player.id].name}'s turn` : match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
+  const result=winner?`${SHIPS[scene.shipKinds[Number(winner[1])-1]].name} wins!`:match.outcome
+  document.querySelector('#turn-status')!.textContent=result??(ready?`P${player.id+1} · ${SHIPS[scene.shipKinds[player.id]].name}'s turn` : match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
   document.querySelector<HTMLButtonElement>('#fire')!.disabled=!ready||!player.grounded||player.health===0||match.pointerId!==undefined
   for(const id of ['move-left','move-right'])document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled=!ready||player.movementRemaining<=0
 })
+
+
+export function startMatch(ship:number,count:number){
+  resetWheel()
+  scene.shipKinds=shipOrder(ship)
+  document.querySelector<HTMLSelectElement>('#player-count')!.value=String(count)
+  scene.restart(count)
+  scene.setGameplayEnabled(true)
+  if(scene.sys.isPaused())scene.scene.resume()
+}
+export function pauseMatch(){
+  resetWheel();scene.setGameplayEnabled(false);scene.scene.pause()
+}
+export function resumeMatch(){scene.setGameplayEnabled(true);scene.scene.resume()}

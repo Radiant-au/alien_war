@@ -1,5 +1,5 @@
 {
-  "name": "wizard_war",
+  "name": "alien_war",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,3 +17,4 @@
     "phaser": "^4.2.1"
   }
 }
+
