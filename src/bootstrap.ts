@@ -140,7 +140,7 @@ for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener
 window.addEventListener('alien-war-shot',()=>audio.shot())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
 get('#loading-back').addEventListener('click',()=>{overlay.hidden=true;showMenu()})
-updateSelection();updateAudio();menuVisible(true)
+updateSelection();updateAudio();audio.start();menuVisible(true)
 // Artwork failure cannot prevent the menu from becoming usable. Phaser is loaded
 // only on New Game; its event plugins are never read before initialization.
 void (async()=>{

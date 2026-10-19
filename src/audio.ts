@@ -1,23 +1,23 @@
 import type { Preferences } from './preferences.ts'
 
-/** Lightweight original synth cues; no third-party audio files or autoplay. */
+/** Shared music and lightweight synth sound effects. */
 export class GameAudio {
   private context?: AudioContext
-  private musicBus?: GainNode
   private effectsBus?: GainNode
-  private timer?: number
-  private step = 0
+  private music = new Audio('/assets/music/intro.mp3')
   private active = false
   private settings: Preferences
   constructor(settings: Preferences) {
     this.settings = settings
+    this.music.loop = true
+    this.music.preload = 'auto'
     document.addEventListener('visibilitychange', () => this.sync())
   }
+  start() { this.active = true; this.sync() }
   unlock() {
     try {
       if (!this.context) {
         this.context = new AudioContext()
-        this.musicBus = this.context.createGain(); this.musicBus.connect(this.context.destination)
         this.effectsBus = this.context.createGain(); this.effectsBus.connect(this.context.destination)
       }
       void this.context.resume().catch(() => {})
@@ -28,13 +28,10 @@ export class GameAudio {
   stop() { this.active = false; this.sync() }
   private sync() {
     const audible = this.active && this.settings.sound && !document.hidden
-    if (this.musicBus) this.musicBus.gain.value = audible ? this.settings.music / 100 * .07 : 0
     if (this.effectsBus) this.effectsBus.gain.value = audible ? this.settings.sfx / 100 * .12 : 0
-    if (this.timer !== undefined) window.clearInterval(this.timer)
-    this.timer = undefined
-    if (audible && this.context) this.timer = window.setInterval(() => {
-      this.tone([130.81,196,164.81,261.63,196,164.81,146.83,196][this.step++ % 8], .55, this.musicBus!)
-    }, 650)
+    this.music.volume = this.settings.music / 100
+    if (audible && this.settings.music > 0) void this.music.play().catch(() => {})
+    else this.music.pause()
   }
   private tone(frequency: number, duration: number, bus: GainNode, end = frequency) {
     const context = this.context!
