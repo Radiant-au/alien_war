@@ -2,15 +2,15 @@
 let backgroundId=0
 export function backgroundMarkup(): string {
   const prefix=`sky-${++backgroundId}-`
-  const meteors=Array.from({length:2},()=>{
+  const meteors=Array.from({length:4},()=>{
     const x=120+Math.random()*1150,y=35+Math.random()*200
-    return `<g class="scenery-meteor" style="--meteor-delay:${Math.random()*30}s;--meteor-cycle:${40+Math.random()*30}s"><path d="M${x} ${y}l-95-42" stroke="url(#meteor-trail)" stroke-width="2" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="2" fill="#e5fcff"/></g>`
+    return `<g class="scenery-meteor" style="--meteor-delay:${-Math.random()*24}s;--meteor-cycle:${18+Math.random()*18}s"><path d="M${x} ${y}l-95-42" stroke="url(#meteor-trail)" stroke-width="2" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="2" fill="#e5fcff"/></g>`
   }).join('')
   const markup= `<svg class="scenery" viewBox="0 0 1672 940" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
   <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#101a46"/><stop offset=".7" stop-color="#4a4780"/><stop offset="1" stop-color="#727099"/></linearGradient><radialGradient id="moonlight"><stop stop-color="#efedcd" stop-opacity=".22"/><stop offset="1" stop-color="#efedcd" stop-opacity="0"/></radialGradient><radialGradient id="aurora"><stop stop-color="#52e3d5" stop-opacity=".18"/><stop offset="1" stop-color="#52e3d5" stop-opacity="0"/></radialGradient><linearGradient id="mist" x2="0" y2="1"><stop stop-color="#8b91c7" stop-opacity="0"/><stop offset=".5" stop-color="#8b91c7" stop-opacity=".14"/><stop offset="1" stop-color="#8b91c7" stop-opacity="0"/></linearGradient></defs>
   <defs><linearGradient id="meteor-trail"><stop stop-color="#d9faff"/><stop offset="1" stop-color="#a9dfff" stop-opacity="0"/></linearGradient></defs>
   <path fill="url(#sky)" d="M0 0h1672v940H0Z"/>
-  <g class="scenery-stars">${Array.from({length:64},(_,i)=>`<circle cx="${(i*271+89)%1672}" cy="${(i*137+37)%440}" r="${i%5===0?1.8:1}" fill="#e4ebff" opacity="${.25+(i%4)*.15}"/>`).join('')}</g>
+  <g class="scenery-stars">${Array.from({length:64},(_,i)=>`<circle class="scenery-star" style="--star-cycle:${4+(i%7)}s;--star-delay:${-i*.73}s;--star-brightness:${.4+(i%4)*.18}" cx="${(i*271+89)%1672}" cy="${(i*137+37)%440}" r="${i%5===0?1.8:1}" fill="#e4ebff" opacity="${.25+(i%4)*.15}"/>`).join('')}</g>
   ${meteors}
   <ellipse class="scenery-aurora" cx="830" cy="300" rx="620" ry="150" fill="url(#aurora)"/>
   <circle class="scenery-moon-halo" cx="300" cy="190" r="100" fill="url(#moonlight)"/><circle class="scenery-moon-disc" cx="300" cy="190" r="44" fill="#aaa6e3"/>
@@ -23,4 +23,5 @@ export function backgroundMarkup(): string {
   <path class="scenery-mist" fill="url(#mist)" d="M-120 510h1912v160H-120Z"/></svg>`
   return markup.replace(/id="([^"]+)"/g,(_,id)=>`id="${prefix}${id}"`).replace(/url\(#([^)]+)\)/g,(_,id)=>`url(#${prefix}${id})`)
 }
+
 

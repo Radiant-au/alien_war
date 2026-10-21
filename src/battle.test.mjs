@@ -53,7 +53,7 @@ test('wide arena ridges block the straight sightline between every neighboring s
 
 test('neighboring ships remain reachable with arcing shots over the new ridges',()=>{
   const match=createMatch(42,4)
-  for(const [shooter,power,degrees] of [[0,.45,26],[1,.45,52],[2,.55,42]]){
+  for(const [shooter,power,degrees] of [[0,.475,39],[1,.4,43],[2,.55,37]]){
     const player=match.players[shooter]
     player.power=power;player.aimAngle=-degrees*Math.PI/180
     const shot=createShot(player);let result
@@ -62,3 +62,4 @@ test('neighboring ships remain reachable with arcing shots over the new ridges',
     assert.equal(result.target,shooter+1)
   }
 })
+

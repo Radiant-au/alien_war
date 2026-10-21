@@ -3,7 +3,7 @@ import { aimFeedbackAlpha, dragAim } from './aim.ts'
 import { WORLD_WIDTH } from './config.ts'
 import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, type Match } from './match.ts'
 import { createShot, createSpreadShots, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory, type Shot } from './projectile.ts'
-import { surfaceAt, type Player } from './terrain.ts'
+import { nextTerrainVariant, surfaceAt, type Player } from './terrain.ts'
 import { SPELLS, type Spell } from './spells.ts'
 import { drawShip, SHIPS } from './ships.ts'
 import { shipPose, shotRecoil } from './ship-motion.ts'
@@ -27,6 +27,7 @@ export class LandscapeScene extends Phaser.Scene {
   onStartupReady=()=>{}
   onStartupError=(_error:unknown)=>{}
   match=createMatch(0x51a7,4)
+  private terrainVariants=new Map<number,number>()
   selectedSpell=0
   private shotSpell:Spell=SPELLS[0]
   private terrainTexture?:Phaser.Textures.CanvasTexture
@@ -158,7 +159,9 @@ export class LandscapeScene extends Phaser.Scene {
     this.syncMissile()
   }
   restart(count=this.match.players.length){
-    this.clearInputs();this.clearMissile();this.burningUntil.clear();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
+    const variant=nextTerrainVariant(this.terrainVariants.get(count))
+    this.terrainVariants.set(count,variant)
+    this.clearInputs();this.clearMissile();this.burningUntil.clear();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count,variant);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
     this.previousX=this.match.players.map(p=>p.x);for(const p of this.particles){this.tweens.killTweensOf(p);p.destroy()}this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     if(this.actors){this.generateCrystals();this.drawTerrain();this.resizeView()}
   }
@@ -443,5 +446,6 @@ export class LandscapeScene extends Phaser.Scene {
     this.trackEffect(target);this.tweens.add({targets:target,...options,onComplete:()=>this.removeEffect(target)})
   }
 }
+
 
 

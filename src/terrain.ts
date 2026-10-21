@@ -17,6 +17,8 @@ export {
 } from "./config.ts";
 
 export interface Terrain {
+  layoutId: string;
+  variant: number;
   heights: number[];
   initialHeights: number[];
   textureOffset: { x: number; y: number };
@@ -41,31 +43,50 @@ export function playerStarts(count = 2): readonly number[] {
   return count === 2 ? PLAYER_START_FRACTIONS : count === 3 ? [0.09, 0.59, 0.91] : [0.09, 0.37, 0.59, 0.91];
 }
 
-export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
+// Each mode has its own silhouette; normalized coordinates keep the world wide.
+export const TERRAIN_LAYOUTS: Record<number, readonly { id: string; anchors: readonly (readonly [number, number])[] }[]> = {
+  2: [
+    { id: 'duel-crown', anchors: [[0,.58],[.13,.58],[.23,.79],[.30,.79],[.43,.22],[.53,.22],[.66,.81],[.73,.81],[.87,.60],[1,.60]] },
+    { id: 'duel-twin-spires', anchors: [[0,.65],[.13,.65],[.24,.24],[.29,.24],[.40,.78],[.50,.36],[.60,.78],[.71,.24],[.76,.24],[.87,.65],[1,.65]] },
+  ],
+  3: [
+    { id: 'trio-crater-gates', anchors: [[0,.62],[.13,.62],[.24,.80],[.31,.23],[.37,.23],[.49,.65],[.63,.65],[.72,.22],[.77,.22],[.87,.61],[1,.61]] },
+    { id: 'trio-highland-bowls', anchors: [[0,.51],[.13,.51],[.25,.25],[.33,.25],[.44,.80],[.49,.80],[.55,.60],[.63,.60],[.70,.28],[.77,.28],[.87,.72],[1,.72]] },
+  ],
+  4: [
+    { id: 'squad-sawtooth', anchors: [[0,.65],[.13,.65],[.21,.24],[.25,.24],[.33,.64],[.41,.64],[.46,.25],[.50,.25],[.55,.66],[.63,.66],[.72,.23],[.77,.23],[.87,.64],[1,.64]] },
+    { id: 'squad-fortress', anchors: [[0,.58],[.13,.58],[.20,.32],[.26,.32],[.33,.73],[.41,.73],[.46,.21],[.50,.21],[.55,.73],[.63,.73],[.71,.32],[.78,.32],[.87,.58],[1,.58]] },
+  ],
+};
+
+/** Alternate per mode, including when returning from a different player count. */
+export function nextTerrainVariant(previous?: number, random = Math.random): number {
+  return previous === undefined ? Math.min(1, Math.floor(random() * 2)) : 1 - previous;
+}
+
+export function createTerrain(seed = 0x51a7, playerCount = 2, variant = (seed >>> 0) % 2): Terrain {
   const starts = playerStarts(playerCount);
+  if (variant !== 0 && variant !== 1) throw new RangeError('Choose terrain variant 0 or 1');
   let state = seed >>> 0;
   const random = () => {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
   };
-  const anchors = [
-    [0, .40], [.125, .40], [.15, .51], [.185, .51], [.21, .69], [.23, .69],
-    [.255, .28], [.275, .28], [.30, .82], [.33, .82], [.35, .72], [.425, .72],
-    [.47, .20], [.50, .20], [.535, .54], [.55, .54], [.565, .64], [.635, .64],
-    [.66, .82], [.70, .82], [.745, .30], [.765, .30], [.79, .68], [.82, .68],
-    [.85, .47], [.96, .47], [.98, .52], [1, .52],
-  ];
-  const variation = random() * 10 - 5;
+  const layout = TERRAIN_LAYOUTS[playerCount][variant];
+  // Perturb shared anchor heights and interior positions, rather than shifting
+  // the entire map vertically. Flat shelves and ordered ramps stay intact.
+  const jitter = new Map<number, number>();
+  const anchors = layout.anchors.map(([x, y]) => {
+    if (!jitter.has(y)) jitter.set(y, (random() - .5) * .035);
+    return [x === 0 || x === 1 ? x : x + (random() - .5) * .008, y + jitter.get(y)!];
+  });
+  let segment = 0;
   const heights = Array.from({ length: WORLD_WIDTH + 1 }, (_, x) => {
     const u = x / WORLD_WIDTH;
-    const index = Math.max(0, anchors.findIndex(anchor => anchor[0] >= u) - 1);
-    const a = anchors[index], b = anchors[Math.min(index + 1, anchors.length - 1)];
+    while (segment < anchors.length - 2 && u > anchors[segment + 1][0]) segment++;
+    const a = anchors[segment], b = anchors[segment + 1];
     const t = (u - a[0]) / (b[0] - a[0]);
-    // Keep ramps angular, while the two deep basins have gently rounded floors.
-    const rounded = (u > .275 && u < .35) || (u > .635 && u < .70);
-    const blend = rounded ? t * t * (3 - 2 * t) : t;
-    const profile = (playerCount - 2) * .018 * Math.sin(u * Math.PI * (playerCount + 4));
-    return (a[1] + (b[1] - a[1]) * blend + profile) * WORLD_HEIGHT + variation;
+    return (a[1] + (b[1] - a[1]) * t) * WORLD_HEIGHT;
   });
   for (const fraction of starts) {
     const center = Math.round(WORLD_WIDTH * fraction), ground = heights[center];
@@ -78,6 +99,8 @@ export function createTerrain(seed = 0x51a7, playerCount = 2): Terrain {
   const initialHeights = [...heights];
   const tileWorldSize = SOIL_TEXTURE_SIZE * SOIL_TEXTURE_SCALE;
   return {
+    layoutId: layout.id,
+    variant,
     heights,
     initialHeights,
     textureOffset: { x: random() * tileWorldSize, y: random() * tileWorldSize },
@@ -158,3 +181,4 @@ export function explosionDamage(
   const dy = Math.max(top - cy, 0, cy - bottom);
   return Math.round(maximumDamage * Math.max(0, 1 - Math.hypot(dx, dy) / radius));
 }
+

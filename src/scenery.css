@@ -1,10 +1,15 @@
-/* Two short, quiet meteor passes per sky, with randomized long cycles. */
+/* Staggered meteors and independent stars gently fading in and out. */
 .scenery .scenery-meteor{opacity:0;pointer-events:none;animation:sky-meteor var(--meteor-cycle,55s) linear var(--meteor-delay,10s) infinite}
 .scenery .scenery-moon-halo{transform-box:fill-box;transform-origin:center;animation:moon-halo-breathe 9s ease-in-out infinite alternate}
 .scenery .scenery-moon-disc{animation:moon-disc-breathe 9s ease-in-out infinite alternate}
 .scenery .scenery-planet-glow{transform-box:fill-box;transform-origin:center;animation:planet-halo-breathe 17s ease-in-out infinite alternate}
-@keyframes sky-meteor{0%,96%{opacity:0;transform:translate(0,0)}97%{opacity:.65;transform:translate(45px,20px)}100%{opacity:0;transform:translate(235px,105px)}}
+@keyframes sky-meteor{0%,93%{opacity:0;transform:translate(0,0)}95%{opacity:.7;transform:translate(45px,20px)}100%{opacity:0;transform:translate(235px,105px)}}
 @keyframes moon-halo-breathe{from{opacity:.6;transform:scale(.94)}to{opacity:1;transform:scale(1.12)}}
 @keyframes moon-disc-breathe{from{opacity:.94}to{opacity:1}}
 @keyframes planet-halo-breathe{from{opacity:.035;transform:scale(.98)}to{opacity:.085;transform:scale(1.05)}}
 @media(prefers-reduced-motion:reduce){.scenery .scenery-meteor{display:none;animation:none}.scenery .scenery-moon-halo,.scenery .scenery-moon-disc,.scenery .scenery-planet-glow{animation:none}}
+
+
+.scenery .scenery-star{transform-box:fill-box;transform-origin:center;animation:sky-star-fade var(--star-cycle) ease-in-out var(--star-delay) infinite}
+@keyframes sky-star-fade{0%,100%{opacity:.08;transform:scale(.65)}50%{opacity:var(--star-brightness);transform:scale(1.18)}}
+@media(prefers-reduced-motion:reduce){.scenery .scenery-star{animation:none}}
