@@ -175,7 +175,7 @@ async function loadOpening(){
   const assets=[
     'electric_weapon_16.png',
     'ice_missile_spritesheet.svg','poison_missile_spritesheet.svg',
-    'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
+    'electric_missile_spritesheet.svg','fire_cluster_spritesheet.svg',
     'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
   const total=assets.length+3+SFX_ASSETS.length
