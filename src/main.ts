@@ -19,7 +19,7 @@ ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
 </section>
 <footer class="command-bar" aria-label="Weapon controls">
-  <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.effect}.jpeg" alt="" /></span><span>${spell.name}</span></button>`).join('')}</div>
+  <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.icon}" alt="" /></span><span>${spell.name}</span></button>`).join('')}</div>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
 </footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
 
@@ -139,3 +139,4 @@ export function pauseMatch(){
   resetWheel();scene.setGameplayEnabled(false);scene.scene.pause()
 }
 export function resumeMatch(){scene.setGameplayEnabled(true);scene.scene.resume()}
+

@@ -176,7 +176,7 @@ async function loadOpening(){
     'electric_weapon_16.png',
     'ice_missile_spritesheet.svg','poison_missile_spritesheet.svg',
     'electric_missile_spritesheet.svg','fire_cluster_spritesheet.svg',
-    'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
+    'ice.jpeg','poison.jpeg','electric.jpeg','fire_cluster_icon.svg',
   ]
   const total=assets.length+3+SFX_ASSETS.length
   const downloaded=()=>{if(failed)return;completed++;status.textContent=`Downloading assets · ${completed}/${total}`}
