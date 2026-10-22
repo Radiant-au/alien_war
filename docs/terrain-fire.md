@@ -1,6 +1,6 @@
 # Lingering terrain fire
 
-Fire weapon impacts keep the existing short explosion, then leave a cluster of small cartoon flames across the newly carved surface. The twelve-frame flame texture is generated once with Canvas curves; no new image downloads or asset pipeline steps are needed. Warm halos, ember cracks, drifting ember dots, and translucent smoke complement the teal terrain.
+Fire weapon impacts now use a brief procedural upward fire bloom, warm flash and amber ring, then leave a cluster of small flames across the newly carved surface. The old fire explosion PNG is no longer loaded or animated. The 32-frame flame texture is generated once with layered Canvas gradients and independently moving tongues; no new image downloads or asset pipeline steps are needed. Cream cores, amber/orange edges, warm halos, ember cracks, drifting ember dots and blue-gray smoke complement the teal terrain. Subtle independent swaying and changing tongue heights give the flames a more natural appearance while retaining the simple game style.
 
 Flames burn for seven seconds, shrinking during the final two seconds. The dark scorch strip lasts 22 seconds and fades over its final six seconds. These are cosmetic timers; damage, turn progression, and movement are unchanged. Existing ship-hit fire remains separate.
 

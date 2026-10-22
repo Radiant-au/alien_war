@@ -41,7 +41,7 @@ test('fire fades out before the scorch mark and both expire',()=>{
 import { TerrainFire } from './terrain-fire.ts'
 test('renderer bounds repeated impacts, expires flames, and clears restart/shutdown objects',()=>{
   const previous=globalThis.document
-  const context=new Proxy({}, {get:()=>()=>{}})
+  const context=new Proxy({}, {get:(_target,key)=>key==='createLinearGradient'?()=>({addColorStop(){}}):()=>{}})
   globalThis.document={createElement:()=>({getContext:()=>context})}
   const images=[],graphics=[]
   function object(list){

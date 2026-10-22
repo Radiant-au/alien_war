@@ -61,7 +61,6 @@ export class LandscapeScene extends Phaser.Scene {
   constructor(){super('battlefield')}
   setHud(callback:(hud:BattleHud)=>void){this.hud=callback}
   preload(){
-    this.load.spritesheet('fire-impact','/assets/fire_explosion_32_grid.png',{frameWidth:256,frameHeight:256})
     this.load.spritesheet('electric-impact','/assets/electric_weapon_16.png',{frameWidth:256,frameHeight:256})
     for(const type of ['ice','poison','electric','fire'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
   }
@@ -70,7 +69,6 @@ export class LandscapeScene extends Phaser.Scene {
     catch(error) { this.onStartupError(error); console.error('Arena startup failed',error) }
   }
   private createArena(){
-    if(!this.anims.exists('fire-impact-blast'))this.anims.create({key:'fire-impact-blast',frames:this.anims.generateFrameNumbers('fire-impact',{start:0,end:4}),frameRate:15,repeat:0})
     if(!this.anims.exists('electric-impact-animation'))this.anims.create({key:'electric-impact-animation',frames:this.anims.generateFrameNumbers('electric-impact',{start:0,end:15}),frameRate:18,repeat:0})
     for(const type of ['ice','poison','electric','fire']){
       const key=`missile-${type}-travel`
@@ -373,14 +371,9 @@ export class LandscapeScene extends Phaser.Scene {
     const flash=this.add.circle(x,groundY,radius*.16,0xffffff,.8).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD)
     this.animateEffect(flash,{radius:radius*1.3,alpha:0,duration:this.reducedMotion?140:250,ease:'Cubic.Out'})
     const ring=this.add.graphics().setPosition(x,groundY).setDepth(depth)
-    ring.lineStyle(4,spell.color,.95);ring.strokeCircle(0,0,radius*.32)
+    ring.lineStyle(4,spell.effect==='fire'?0xffa13c:spell.color,.95);ring.strokeCircle(0,0,radius*.32)
     this.animateEffect(ring,{scale:2.2,alpha:0,duration:this.reducedMotion?220:520,ease:'Cubic.Out'})
     if(spell.effect==='fire'){
-      const fire=this.add.sprite(x,groundY,'fire-impact').setOrigin(.5,.82).setDisplaySize(radius*2.8,radius*2.8).setDepth(depth)
-      this.anchorToTerrain(fire,x,0)
-      this.trackEffect(fire)
-      fire.once('animationcomplete-fire-impact-blast',()=>this.removeEffect(fire))
-      fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15})
       this.terrainFire?.add(this.match.terrain,x,radius)
       if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xff8a2b,radius)
     }else if(spell.effect==='electric'){
