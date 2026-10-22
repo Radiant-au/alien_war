@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { startupSignal, withDeadline, remainingLoadingTime } from './startup.ts'
-import { normalizePreferences, shipOrder } from './preferences.ts'
+import { startupSignal, withDeadline, remainingLoadingTime } from '../src/app/startup.ts'
+import { normalizePreferences, shipOrder } from '../src/app/preferences.ts'
 
 test('startup readiness survives completion before the importing caller subscribes', async () => {
   const signal = startupSignal(100)

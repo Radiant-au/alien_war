@@ -1,9 +1,9 @@
 import type { Preferences } from './preferences.ts'
-import introTrack from '../assets/music/intro.mp3?url'
-import menuTrack from '../assets/music/main_menu.mp3?url'
-import shootSound from '../assets/Sfx/shoot.mp3?url'
-import electricSound from '../assets/Sfx/electric.ogg?url'
-import poisonSound from '../assets/Sfx/poison.ogg?url'
+import introTrack from '../../assets/music/intro.mp3?url'
+import menuTrack from '../../assets/music/main_menu.mp3?url'
+import shootSound from '../../assets/Sfx/shoot.mp3?url'
+import electricSound from '../../assets/Sfx/electric.ogg?url'
+import poisonSound from '../../assets/Sfx/poison.ogg?url'
 
 export const SFX_ASSETS = [shootSound, electricSound, poisonSound]
 
@@ -60,7 +60,7 @@ export class GameAudio {
     if (this.effectsBus) this.effectsBus.gain.value = audible ? this.settings.sfx / 100 * .12 : 0
     for(const pool of Object.values(this.samples))for(const sample of pool)sample.volume=audible?this.settings.sfx/100:0
     if(!audible)this.stopSamples()
-    this.music.volume = Math.min(1, this.settings.music / 100 * (this.scene === 'loading' ? 1.5 : this.scene === 'menu' ? .65 : .2))
+    this.music.volume = Math.min(1, this.settings.music / 100 * (this.scene === 'loading' ? 1.6 : this.scene === 'menu' ? .65 : .8))
     if (audible && this.settings.music > 0) void this.music.play().catch(() => {})
     else this.music.pause()
   }

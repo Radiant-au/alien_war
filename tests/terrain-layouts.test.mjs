@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrain, createPlayers, nextTerrainVariant, surfaceAt, WORLD_WIDTH, WORLD_HEIGHT, PLAYER_WIDTH } from './terrain.ts'
-import { createShot, stepShot } from './projectile.ts'
+import { createTerrain, createPlayers, nextTerrainVariant, surfaceAt, WORLD_WIDTH, WORLD_HEIGHT, PLAYER_WIDTH } from '../src/game/terrain.ts'
+import { createShot, stepShot } from '../src/game/projectile.ts'
 
 test('six distinct layouts stay reproducible, bounded, and provide flat supported spawns', () => {
   const ids = new Set()

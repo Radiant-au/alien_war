@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { shotRecoil } from './ship-motion.ts'
+import { shotRecoil } from '../src/rendering/ship-motion.ts'
 
 test('recoil kicks opposite firing direction and settles to its original pose',()=>{
  const right=shotRecoil(.055,-Math.PI/4,1)

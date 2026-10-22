@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createMatch, fire, resolveShot, updateMatch } from './match.ts'
-import { createShot, stepShot, STEP_SECONDS } from './projectile.ts'
-import { surfaceAt } from './terrain.ts'
-import { WORLD_WIDTH } from './config.ts'
-import { SPELLS } from './spells.ts'
+import { createMatch, fire, resolveShot, updateMatch } from '../src/game/match.ts'
+import { createShot, stepShot, STEP_SECONDS } from '../src/game/projectile.ts'
+import { surfaceAt } from '../src/game/terrain.ts'
+import { WORLD_WIDTH } from '../src/game/config.ts'
+import { SPELLS } from '../src/game/spells.ts'
 
 test('central ridge blocks a low shot before it reaches the other wizard',()=>{
   const match=createMatch();const player=match.players[0]

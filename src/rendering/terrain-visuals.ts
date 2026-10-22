@@ -1,5 +1,5 @@
-import { GRASS_START_CLEAR_RADIUS, GRASS_TUFT_DENSITY, PLAYER_START_FRACTIONS, WORLD_WIDTH } from './config.ts'
-import type { Terrain } from './terrain.ts'
+import { GRASS_START_CLEAR_RADIUS, GRASS_TUFT_DENSITY, PLAYER_START_FRACTIONS, WORLD_WIDTH } from '../game/config.ts'
+import type { Terrain } from '../game/terrain.ts'
 
 export interface GrassTuft {
   x: number

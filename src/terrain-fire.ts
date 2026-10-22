@@ -1,5 +1,5 @@
 import type Phaser from 'phaser'
-import type { Terrain } from './terrain.ts'
+import type { Terrain } from './game/terrain.ts'
 import { BURN_SECONDS, SCORCH_SECONDS, MAX_BURN_PATCHES, burnStrength, scorchStrength, burnSupported, createBurnPatch, type BurnPatch } from './terrain-burn.ts'
 
 interface Flame { sprite:Phaser.GameObjects.Image; glow:Phaser.GameObjects.Image; index:number; phase:number; height:number }

@@ -1,5 +1,5 @@
-import { PLAYER_START_FRACTIONS, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
-import type { Terrain } from './terrain.ts'
+import { PLAYER_START_FRACTIONS, WORLD_HEIGHT, WORLD_WIDTH } from '../game/config.ts'
+import type { Terrain } from '../game/terrain.ts'
 
 export interface TerrainDecoration {
   key: string

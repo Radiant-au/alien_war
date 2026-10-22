@@ -1,5 +1,5 @@
-import { PLAYER_HEIGHT, PLAYER_WIDTH } from './config.ts'
-import { surfaceAt, type Player, type Terrain } from './terrain.ts'
+import { PLAYER_HEIGHT, PLAYER_WIDTH } from '../game/config.ts'
+import { surfaceAt, type Player, type Terrain } from '../game/terrain.ts'
 
 /** Visual-only pose; never move the collision body for hover or slope animation. */
 export function shipPose(terrain: Terrain, player: Player, time: number, reducedMotion = false) {

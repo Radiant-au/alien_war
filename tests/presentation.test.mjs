@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrain, carveCrater } from './terrain.ts'
-import { createDecorations, decorationDestroyed } from './decorations.ts'
-import { viewportMetrics } from './viewport.ts'
-import { createMatch, overviewZoom, overviewScrollX, updateMatch } from './match.ts'
-import { WORLD_WIDTH } from './config.ts'
+import { createTerrain, carveCrater } from '../src/game/terrain.ts'
+import { createDecorations, decorationDestroyed } from '../src/rendering/decorations.ts'
+import { viewportMetrics } from '../src/rendering/viewport.ts'
+import { createMatch, overviewZoom, overviewScrollX, updateMatch } from '../src/game/match.ts'
+import { WORLD_WIDTH } from '../src/game/config.ts'
 
 test('decorations are seeded, use all existing asset names, and stay within the terrain', () => {
   const terrain = createTerrain(42)

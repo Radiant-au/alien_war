@@ -1,4 +1,4 @@
-import { surfaceAt, type Terrain } from './terrain.ts'
+import { surfaceAt, type Terrain } from './game/terrain.ts'
 
 export const BURN_SECONDS = 7
 export const SCORCH_SECONDS = 22

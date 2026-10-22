@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { CLIMB_LIMIT, MOVEMENT_ALLOWANCE, PLAYER_START_FRACTIONS, PLAYER_HEIGHT, PLAYER_WIDTH, VIEW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
-import { movePlayer, stepPlayerGravity } from './movement.ts'
-import { carveCrater, createPlayers, createTerrain, explosionDamage, playerSupport, surfaceAt } from './terrain.ts'
-import { createShot, MAX_SPEED, STEP_SECONDS, stepShot, sweepShot, trajectory } from './projectile.ts'
-import { cameraCenterX, overviewScrollX, overviewZoom, createMatch, fire, resolveShot, updateMatch } from './match.ts'
-import { createGrassTufts, tuftSupportDestroyed } from './terrain-visuals.ts'
+import { CLIMB_LIMIT, MOVEMENT_ALLOWANCE, PLAYER_START_FRACTIONS, PLAYER_HEIGHT, PLAYER_WIDTH, VIEW_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from '../src/game/config.ts'
+import { movePlayer, stepPlayerGravity } from '../src/game/movement.ts'
+import { carveCrater, createPlayers, createTerrain, explosionDamage, playerSupport, surfaceAt } from '../src/game/terrain.ts'
+import { createShot, MAX_SPEED, STEP_SECONDS, stepShot, sweepShot, trajectory } from '../src/game/projectile.ts'
+import { cameraCenterX, overviewScrollX, overviewZoom, createMatch, fire, resolveShot, updateMatch } from '../src/game/match.ts'
+import { createGrassTufts, tuftSupportDestroyed } from '../src/rendering/terrain-visuals.ts'
 
 function readyMatch() {
   const match = createMatch()

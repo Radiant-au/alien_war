@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aimFeedbackAlpha, dragAim } from './aim.ts'
-import { createMatch, fire } from './match.ts'
-import { createShot, trajectory } from './projectile.ts'
+import { aimFeedbackAlpha, dragAim } from '../src/game/aim.ts'
+import { createMatch, fire } from '../src/game/match.ts'
+import { createShot, trajectory } from '../src/game/projectile.ts'
 
 test('drag aim handles both directions, distance, camera scaling and bounded downward drags', () => {
   const right=dragAim(80,-80,200),left=dragAim(-80,-80,200)

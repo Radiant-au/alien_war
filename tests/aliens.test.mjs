@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createMatch, fire, resolveShot, updateMatch, overviewZoom, overviewScrollX } from './match.ts'
-import { createTerrain, createPlayers, playerSupport, playerStarts } from './terrain.ts'
-import { movePlayer } from './movement.ts'
-import { STEP_SECONDS, sweepShot } from './projectile.ts'
-import { MOVEMENT_ALLOWANCE, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_GAP, WORLD_WIDTH } from './config.ts'
-import { shipPose } from './ship-motion.ts'
+import { createMatch, fire, resolveShot, updateMatch, overviewZoom, overviewScrollX } from '../src/game/match.ts'
+import { createTerrain, createPlayers, playerSupport, playerStarts } from '../src/game/terrain.ts'
+import { movePlayer } from '../src/game/movement.ts'
+import { STEP_SECONDS, sweepShot } from '../src/game/projectile.ts'
+import { MOVEMENT_ALLOWANCE, PLAYER_HEIGHT, PLAYER_WIDTH, PLAYER_GAP, WORLD_WIDTH } from '../src/game/config.ts'
+import { shipPose } from '../src/rendering/ship-motion.ts'
 
 function ready(match) {
   for(let i=0;i<500&&match.phase!=='MovementAiming'&&match.phase!=='GameOver';i++)updateMatch(match,STEP_SECONDS)

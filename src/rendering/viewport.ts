@@ -1,4 +1,4 @@
-import { VIEW_HEIGHT, VIEW_WIDTH } from './config.ts'
+import { VIEW_HEIGHT, VIEW_WIDTH } from '../game/config.ts'
 
 /** Keep the battlefield proportional while filling every browser aspect ratio. */
 export function viewportMetrics(width: number, height: number) {
