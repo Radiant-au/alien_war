@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { TerrainFire } from './terrain-fire.ts'
 import { aimFeedbackAlpha, dragAim } from './aim.ts'
 import { WORLD_WIDTH } from './config.ts'
 import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, type Match } from './match.ts'
@@ -37,6 +38,7 @@ export class LandscapeScene extends Phaser.Scene {
   private held=new Map<number,-1|1>()
   private crystalGlows:Phaser.GameObjects.Image[]=[]
   private crystals:Crystal[]=[]
+  private terrainFire?:TerrainFire
   private burningUntil=new Map<number,number>()
   private particles:Phaser.GameObjects.GameObject[]=[]
   private volleyShots:Shot[]=[]
@@ -69,8 +71,6 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private createArena(){
     if(!this.anims.exists('fire-impact-blast'))this.anims.create({key:'fire-impact-blast',frames:this.anims.generateFrameNumbers('fire-impact',{start:0,end:4}),frameRate:15,repeat:0})
-    if(!this.anims.exists('fire-impact-burn'))this.anims.create({key:'fire-impact-burn',frames:this.anims.generateFrameNumbers('fire-impact',{start:5,end:23}),frameRate:8,repeat:2})
-    if(!this.anims.exists('fire-impact-fade'))this.anims.create({key:'fire-impact-fade',frames:this.anims.generateFrameNumbers('fire-impact',{start:24,end:31}),frameRate:7,repeat:0})
     if(!this.anims.exists('electric-impact-animation'))this.anims.create({key:'electric-impact-animation',frames:this.anims.generateFrameNumbers('electric-impact',{start:0,end:15}),frameRate:18,repeat:0})
     for(const type of ['ice','poison','electric','fire']){
       const key=`missile-${type}-travel`
@@ -80,6 +80,7 @@ export class LandscapeScene extends Phaser.Scene {
     const ctx=halo.getContext('2d')!,gradient=ctx.createRadialGradient(64,64,0,64,64,64)
     gradient.addColorStop(0,'rgba(255,255,255,.65)');gradient.addColorStop(.25,'rgba(255,255,255,.20)');gradient.addColorStop(1,'rgba(255,255,255,0)')
     ctx.fillStyle=gradient;ctx.fillRect(0,0,128,128);this.textures.addCanvas('halo',halo)
+    this.terrainFire=new TerrainFire(this,this.reducedMotion)
     this.terrainCanvas=document.createElement('canvas');this.terrainCanvas.width=WORLD_WIDTH;this.terrainCanvas.height=2400
     this.terrainTexture=this.textures.addCanvas('battle-terrain',this.terrainCanvas)!
     this.add.image(0,0,'battle-terrain').setOrigin(0).setDepth(0)
@@ -96,6 +97,7 @@ export class LandscapeScene extends Phaser.Scene {
       window.removeEventListener('keydown',this.keyDown);window.removeEventListener('keyup',this.keyUp)
       this.resizeObserver?.disconnect();this.scale.off(Phaser.Scale.Events.RESIZE,this.resizeView,this)
       window.removeEventListener('blur',this.clearInputs);window.removeEventListener('pointerup',this.releasePointer);window.removeEventListener('pointercancel',this.releasePointer);document.removeEventListener('visibilitychange',this.visibility)
+      this.terrainFire?.destroy();this.terrainFire=undefined
       this.clearMissile()
       for(const particle of this.particles){this.tweens.killTweensOf(particle);particle.destroy()}
       this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
@@ -159,6 +161,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.syncMissile()
   }
   restart(count=this.match.players.length){
+    this.terrainFire?.clear()
     const variant=nextTerrainVariant(this.terrainVariants.get(count))
     this.terrainVariants.set(count,variant)
     this.clearInputs();this.clearMissile();this.burningUntil.clear();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count,variant);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
@@ -293,6 +296,7 @@ export class LandscapeScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.scale.width/960*this.match.cameraZoom)
       this.baseScrollY=300-this.cameras.main.height*.72/this.cameras.main.zoom
     }
+    this.terrainFire?.update(Math.min(delta,100)/1000,this.match.terrain)
     this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell,aimFeedback:this.aimFeedback()})
   }
   private aimFeedback(){
@@ -375,8 +379,9 @@ export class LandscapeScene extends Phaser.Scene {
       const fire=this.add.sprite(x,groundY,'fire-impact').setOrigin(.5,.82).setDisplaySize(radius*2.8,radius*2.8).setDepth(depth)
       this.anchorToTerrain(fire,x,0)
       this.trackEffect(fire)
-      fire.once('animationcomplete-fire-impact-fade',()=>this.removeEffect(fire))
-      fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15});fire.chain(['fire-impact-burn','fire-impact-fade'])
+      fire.once('animationcomplete-fire-impact-blast',()=>this.removeEffect(fire))
+      fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15})
+      this.terrainFire?.add(this.match.terrain,x,radius)
       if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xff8a2b,radius)
     }else if(spell.effect==='electric'){
       window.dispatchEvent(new Event('alien-war-electric-impact'))
@@ -446,6 +451,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.trackEffect(target);this.tweens.add({targets:target,...options,onComplete:()=>this.removeEffect(target)})
   }
 }
+
 
 
 
