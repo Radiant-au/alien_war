@@ -19,7 +19,7 @@ interface TerrainPatch {
   strokeColor:number;strokeAlpha:number;strokeWidth:number;thickness:number
 }
 const MISSILE_TEXTURES:Record<Spell['effect'],string>={
-  ice:'missile-ice',poison:'missile-poison',electric:'missile-electric',fire:'missile-fire',
+  ice:'missile-ice',poison:'missile-poison',electric:'missile-electric',fire:'fire-cluster',
 }
 
 export class LandscapeScene extends Phaser.Scene {
@@ -62,7 +62,8 @@ export class LandscapeScene extends Phaser.Scene {
   setHud(callback:(hud:BattleHud)=>void){this.hud=callback}
   preload(){
     this.load.spritesheet('electric-impact','/assets/electric_weapon_16.png',{frameWidth:256,frameHeight:256})
-    for(const type of ['ice','poison','electric','fire'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
+    this.load.spritesheet('fire-cluster','/assets/fire_cluster_spritesheet.svg',{frameWidth:256,frameHeight:128})
+    for(const type of ['ice','poison','electric'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
   }
   create(){
     try { this.createArena(); this.onStartupReady() }
@@ -71,8 +72,9 @@ export class LandscapeScene extends Phaser.Scene {
   private createArena(){
     if(!this.anims.exists('electric-impact-animation'))this.anims.create({key:'electric-impact-animation',frames:this.anims.generateFrameNumbers('electric-impact',{start:0,end:15}),frameRate:18,repeat:0})
     for(const type of ['ice','poison','electric','fire']){
+      const texture=MISSILE_TEXTURES[type as Spell['effect']]
       const key=`missile-${type}-travel`
-      if(!this.anims.exists(key))this.anims.create({key,frames:this.anims.generateFrameNumbers(`missile-${type}`,{start:0,end:3}),frameRate:type==='electric'?16:14,repeat:-1})
+      if(!this.anims.exists(key))this.anims.create({key,frames:this.anims.generateFrameNumbers(texture,{start:0,end:3}),frameRate:type==='electric'?16:14,repeat:-1})
     }
     const halo=document.createElement('canvas');halo.width=halo.height=128
     const ctx=halo.getContext('2d')!,gradient=ctx.createRadialGradient(64,64,0,64,64,64)
@@ -155,7 +157,12 @@ export class LandscapeScene extends Phaser.Scene {
     this.volleyShots=this.shotSpell.effect==='electric'?createSpreadShots(shooter):[this.match.shot!]
     this.match.shot=this.volleyShots[Math.floor(this.volleyShots.length/2)]
     const texture=MISSILE_TEXTURES[this.shotSpell.effect]
-    this.volleyMissiles=this.volleyShots.map(shot=>this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5).play(`missile-${this.shotSpell.effect}-travel`))
+    this.volleyMissiles=this.volleyShots.map(shot=>{
+      const missile=this.add.sprite(shot.x,shot.y,texture).setDepth(5).play(`missile-${this.shotSpell.effect}-travel`)
+      if(this.shotSpell.effect==='fire')missile.setOrigin(180/256,60/128)
+      else missile.setDisplaySize(84,42)
+      return missile
+    })
     this.syncMissile()
   }
   restart(count=this.match.players.length){
@@ -355,12 +362,18 @@ export class LandscapeScene extends Phaser.Scene {
         g.fillCircle(point.x,point.y,Math.max(1.1,2-i*.12)/zoom)
       })
     }
-    if(this.match.shot){
+    if(this.match.shot&&this.shotSpell.effect!=='fire'){
       this.trail.forEach((point,i)=>{g.fillStyle(this.shotSpell.color,i/this.trail.length*.5);g.fillCircle(point.x,point.y,2+i/this.trail.length*3)})
     }
   }
   private syncMissile(){
-    this.volleyShots.forEach((shot,i)=>this.volleyMissiles[i]?.setPosition(shot.x,shot.y).setRotation(Math.atan2(shot.vy,shot.vx)))
+    this.volleyShots.forEach((shot,i)=>{
+      const missile=this.volleyMissiles[i]
+      if(!missile)return
+      missile.setPosition(shot.x,shot.y).setRotation(Math.atan2(shot.vy,shot.vx))
+      // Keep the individual flame silhouettes readable even in the wide overview.
+      if(this.shotSpell.effect==='fire')missile.setDisplaySize(112/this.cameras.main.zoom,56/this.cameras.main.zoom)
+    })
   }
   private clearMissile(){for(const missile of this.volleyMissiles)missile.destroy();this.volleyMissiles=[];this.volleyShots=[]}
   private impact(x:number,spell:Spell,target:'terrain'|number){
