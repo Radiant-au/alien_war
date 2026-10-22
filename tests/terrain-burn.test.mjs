@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrain, carveCrater, surfaceAt } from './terrain.ts'
-import { createBurnPatch, burnSupported, burnStrength, scorchStrength, BURN_SECONDS, SCORCH_SECONDS } from './terrain-burn.ts'
+import { createTerrain, carveCrater, surfaceAt } from '../src/game/terrain.ts'
+import { createBurnPatch, burnSupported, burnStrength, scorchStrength, BURN_SECONDS, SCORCH_SECONDS } from '../src/terrain-burn.ts'
 
 test('burn samples the carved contour and stays inside world edges',()=>{
   for(const x of [0,300,3359]){
@@ -38,7 +38,7 @@ test('fire fades out before the scorch mark and both expire',()=>{
 })
 
 // Exercise the renderer's real lifecycle without loading Phaser's browser runtime.
-import { TerrainFire } from './terrain-fire.ts'
+import { TerrainFire } from '../src/terrain-fire.ts'
 test('renderer bounds repeated impacts, expires flames, and clears restart/shutdown objects',()=>{
   const previous=globalThis.document
   const context=new Proxy({}, {get:(_target,key)=>key==='createLinearGradient'?()=>({addColorStop(){}}):()=>{}})
