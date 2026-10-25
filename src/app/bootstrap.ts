@@ -35,8 +35,10 @@ menu.innerHTML = `${backgroundMarkup()}<div class="menu-ground" aria-hidden="tru
     <div class="menu-selection"><div id="hero-ship" aria-hidden="true"></div><div class="hover-rings" aria-hidden="true"></div>
       <h2>CHOOSE YOUR SHIP</h2><div class="ship-picker"><button id="previous-ship" aria-label="Previous ship">❮</button><strong id="selected-ship" aria-live="polite"></strong><button id="next-ship" aria-label="Next ship">❯</button></div>
       <div class="ship-choices" role="group" aria-label="Player 1 ship">${SHIPS.map((ship,i)=>`<button data-ship="${i}" aria-label="Choose ${ship.name}" aria-pressed="false">${shipPortrait(i)}<span>${ship.name}</span></button>`).join('')}</div>
-      <label class="local-players">LOCAL PLAYERS <select id="menu-players"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label>
-      <p class="menu-note">Your ship is Player 1. Other players use the remaining ships.</p>
+      <label class="local-players">GAME MODE <select id="menu-mode"><option value="local">Local · pass and play</option><option value="ai">Vs AI · single player</option></select></label>
+      <label class="local-players"><span id="players-label">PLAYERS</span> <select id="menu-players"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label>
+      <label class="local-players" id="difficulty-setting">AI DIFFICULTY <select id="menu-difficulty"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
+      <p class="menu-note" id="mode-note"></p>
     </div>
   </div>
   <dialog id="audio-options" aria-labelledby="options-title"><div class="options-heading"><h2 id="options-title">OPTIONS</h2><button id="close-options" aria-label="Close options">×</button></div>
@@ -57,6 +59,15 @@ function updateSelection() {
   get('#selected-ship').textContent = ship.name
   menu.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.ship) === settings.ship)))
   get<HTMLSelectElement>('#menu-players').value = String(settings.players)
+  get<HTMLSelectElement>('#menu-mode').value=settings.mode
+  get<HTMLSelectElement>('#menu-difficulty').value=settings.difficulty
+  get('#difficulty-setting').hidden=settings.mode!=='ai'
+  get('#players-label').textContent=settings.mode==='ai'?'COMPUTER OPPONENTS':'LOCAL PLAYERS'
+  for(const option of get<HTMLSelectElement>('#menu-players').options){
+    const count=Number(option.value)
+    option.textContent=settings.mode==='ai'?`${count-1} AI · ${count} ships`:`${count} players`
+  }
+  get('#mode-note').textContent=settings.mode==='ai'?'You are P1. Computer ships fight on their own turns. Last ship standing wins.':'Pass the device after each turn. Your selected ship is P1.'
   savePreferences(settings)
 }
 function updateAudio() {
@@ -112,7 +123,7 @@ async function newGame() {
     engine ??= await withDeadline(import('./main.ts'), 30000)
     progress(55,'Preparing arena...')
     await engine.gameReady
-    engine.startMatch(settings.ship,settings.players)
+    engine.startMatch(settings.ship,settings.players,settings.mode,settings.difficulty)
     engine.pauseMatch()
     progress(100,'Ready for battle')
     await new Promise(resolve=>window.setTimeout(resolve,250))
@@ -142,11 +153,21 @@ get('#next-ship').addEventListener('click',()=>selectShip((settings.ship+1)%4))
 function selectShip(index:number) { settings.ship=index;updateSelection();audio.unlock();audio.character() }
 menu.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(button=>button.addEventListener('click',()=>selectShip(Number(button.dataset.ship))))
 get<HTMLSelectElement>('#menu-players').addEventListener('change',event=>{settings.players=Number((event.target as HTMLSelectElement).value);savePreferences(settings)})
+get<HTMLSelectElement>('#menu-mode').addEventListener('change',event=>{
+  settings.mode=(event.target as HTMLSelectElement).value==='ai'?'ai':'local';updateSelection();audio.unlock();audio.click()
+})
+get<HTMLSelectElement>('#menu-difficulty').addEventListener('change',event=>{
+  const value=(event.target as HTMLSelectElement).value
+  settings.difficulty=value==='easy'?'easy':value==='hard'?'hard':'normal';updateSelection();audio.click()
+})
 get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.target as HTMLInputElement).checked;audio.unlock();updateAudio();audio.click()})
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
-window.addEventListener('alien-war-shot',()=>audio.shot())
-window.addEventListener('alien-war-electric-impact',()=>audio.electricImpact())
-window.addEventListener('alien-war-poison-impact',()=>audio.poisonImpact())
+window.addEventListener('alien-war-shot',event=>audio.shot((event as CustomEvent).detail?.pan??0))
+window.addEventListener('alien-war-impact',event=>{
+  const detail=(event as CustomEvent).detail;audio.impact(detail?.effect,detail?.pan??0)
+})
+window.addEventListener('alien-war-turn',()=>audio.turn())
+window.addEventListener('alien-war-victory',()=>audio.victory())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
 get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMenu()})
 updateSelection();updateAudio()

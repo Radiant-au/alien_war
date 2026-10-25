@@ -38,3 +38,10 @@
 @media(max-width:650px){.menu-layout{grid-template-columns:1fr;gap:28px;padding:28px 22px;min-height:100dvh}.menu-navigation{max-width:420px;margin:auto;gap:10px}.menu-title{font-size:56px;display:flex;justify-content:center;gap:12px;margin-bottom:10px}.menu-button{font-size:18px;padding:12px}#hero-ship{height:150px;max-width:270px}.hover-rings{margin-bottom:22px}.menu-selection{max-width:440px;width:100%;margin:auto}.menu-note{margin-bottom:12px}.ship-choices svg{height:52px}.ship-choices span{font-size:9px}}
 @media(max-height:480px) and (min-width:651px){.menu-layout{padding:18px 5vw;gap:5vw}.menu-title{font-size:54px;margin-bottom:8px}.menu-navigation{gap:10px}.menu-button{padding:10px;font-size:17px}#hero-ship{height:120px;max-width:240px}.hover-rings{margin-bottom:14px;height:10px;width:120px}.menu-selection h2{font-size:10px;margin-bottom:8px}.ship-picker{margin-bottom:10px}.ship-picker strong{font-size:20px}.ship-picker button{width:48px;height:48px;font-size:24px}.ship-choices svg{height:38px}.local-players{margin-top:10px}.menu-note{font-size:9px;margin-top:7px}}
 @media(prefers-reduced-motion:reduce){#hero-ship{animation:none}.menu-button{transform:none}}
+
+/* Mode settings remain readable on short screens. */
+#main-menu-screen .menu-selection { max-height: calc(100dvh - 36px); overflow-y: auto; padding-block: 14px; }
+#main-menu-screen .local-players { display:flex; align-items:center; justify-content:center; gap:12px; margin:10px 0; }
+#main-menu-screen .local-players[hidden] { display:none; }
+#menu-mode, #menu-difficulty { max-width:230px; color:#e5ffff; background:#162b47; border:1px solid #5c92a1; border-radius:8px; padding:8px; }
+@media(max-height:650px){#main-menu-screen .menu-selection h2 { margin-block:6px; } #main-menu-screen .menu-note { margin:8px 0; }}
