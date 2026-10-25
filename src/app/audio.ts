@@ -60,7 +60,7 @@ export class GameAudio {
     if (this.effectsBus) this.effectsBus.gain.value = audible ? this.settings.sfx / 100 * .12 : 0
     for(const pool of Object.values(this.samples))for(const sample of pool)sample.volume=audible?this.settings.sfx/100:0
     if(!audible)this.stopSamples()
-    this.music.volume = Math.min(1, this.settings.music / 100 * (this.scene === 'loading' ? 1.6 : this.scene === 'menu' ? .65 : .8))
+    this.music.volume = Math.min(1, this.settings.music / 100 * (this.scene === 'menu' ? 1.0 : 1.25))
     if (audible && this.settings.music > 0) void this.music.play().catch(() => {})
     else this.music.pause()
   }
