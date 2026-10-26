@@ -1,7 +1,11 @@
 import '../styles/menu.css'
 import '../styles/scenery.css'
-import { backgroundMarkup } from '../rendering/background.ts'
 import { SHIPS, shipPortrait } from '../rendering/ships.ts'
+import { menuMarkup } from './menu-view.ts'
+import { MenuNavigation } from './menu-state.ts'
+import menuBackgroundUrl from '../../assets/menu/planet-menu.webp'
+import menuHeroUrl from '../../assets/menu/scout-hero.webp'
+import menuLogoUrl from '../../assets/menu/alien-war-title.webp'
 import { readPreferences, savePreferences } from './preferences.ts'
 import { withDeadline, remainingLoadingTime } from './startup.ts'
 import { GameAudio, SFX_ASSETS } from './audio.ts'
@@ -15,7 +19,7 @@ const settings = readPreferences()
 const audio = new GameAudio(settings)
 let engine: typeof import('./main.ts') | undefined
 let starting = false
-let hasMatch = false
+const navigation = new MenuNavigation()
 let opening = true
 let engineReady = false
 let openedAt = 0
@@ -24,50 +28,26 @@ const loadingDuration = 15_000
 const menu = document.createElement('section')
 menu.id = 'main-menu-screen'
 menu.setAttribute('aria-label', 'Alien War main menu')
-menu.innerHTML = `${backgroundMarkup()}<div class="menu-ground" aria-hidden="true"></div>
-  <div class="menu-layout">
-    <div class="menu-navigation"><h1 class="menu-title"><span>ALIEN</span><b>WAR</b></h1>
-      <button id="new-game" class="menu-button primary">▶ NEW GAME</button>
-      <button id="continue-game" class="menu-button" hidden>▶ CONTINUE</button>
-      <button id="open-options" class="menu-button">⚙ OPTIONS</button>
-      <button id="exit-game" class="menu-button">↪ EXIT</button>
-    </div>
-    <div class="menu-selection"><div id="hero-ship" aria-hidden="true"></div><div class="hover-rings" aria-hidden="true"></div>
-      <h2>CHOOSE YOUR SHIP</h2><div class="ship-picker"><button id="previous-ship" aria-label="Previous ship">❮</button><strong id="selected-ship" aria-live="polite"></strong><button id="next-ship" aria-label="Next ship">❯</button></div>
-      <div class="ship-choices" role="group" aria-label="Player 1 ship">${SHIPS.map((ship,i)=>`<button data-ship="${i}" aria-label="Choose ${ship.name}" aria-pressed="false">${shipPortrait(i)}<span>${ship.name}</span></button>`).join('')}</div>
-      <label class="local-players">GAME MODE <select id="menu-mode"><option value="local">Local · pass and play</option><option value="ai">Vs AI · single player</option></select></label>
-      <label class="local-players"><span id="players-label">PLAYERS</span> <select id="menu-players"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label>
-      <label class="local-players" id="difficulty-setting">AI DIFFICULTY <select id="menu-difficulty"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></label>
-      <p class="menu-note" id="mode-note"></p>
-    </div>
-  </div>
-  <dialog id="audio-options" aria-labelledby="options-title"><div class="options-heading"><h2 id="options-title">OPTIONS</h2><button id="close-options" aria-label="Close options">×</button></div>
-    <label class="sound-setting">SOUND <input id="sound-enabled" type="checkbox" role="switch"><span id="sound-label"></span></label>
-    <label class="volume-setting" for="music-volume">MUSIC VOLUME <output id="music-value" for="music-volume"></output></label><input id="music-volume" type="range" min="0" max="100" step="1">
-    <label class="volume-setting" for="sfx-volume">SFX VOLUME <output id="sfx-value" for="sfx-volume"></output></label><input id="sfx-volume" type="range" min="0" max="100" step="1">
-  </dialog>
-  <dialog id="exit-dialog" aria-labelledby="exit-title"><h2 id="exit-title">LEAVE THE GAME?</h2><p>You can close this browser tab to exit.</p><button id="stay-game" class="menu-button primary">BACK TO MENU</button></dialog>`
+menu.innerHTML = menuMarkup(menuBackgroundUrl,menuHeroUrl,menuLogoUrl)
 document.body.append(menu)
 const get = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const options = get<HTMLDialogElement>('#audio-options')
 const exitDialog = get<HTMLDialogElement>('#exit-dialog')
 
 function updateSelection() {
-  const ship = SHIPS[settings.ship]
-  get('#hero-ship').innerHTML = shipPortrait(settings.ship)
-  get('#hero-ship').style.setProperty('--ship-color', '#'+ship.color.toString(16))
-  get('#selected-ship').textContent = ship.name
-  menu.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.ship) === settings.ship)))
-  get<HTMLSelectElement>('#menu-players').value = String(settings.players)
-  get<HTMLSelectElement>('#menu-mode').value=settings.mode
-  get<HTMLSelectElement>('#menu-difficulty').value=settings.difficulty
-  get('#difficulty-setting').hidden=settings.mode!=='ai'
-  get('#players-label').textContent=settings.mode==='ai'?'COMPUTER OPPONENTS':'LOCAL PLAYERS'
-  for(const option of get<HTMLSelectElement>('#menu-players').options){
-    const count=Number(option.value)
-    option.textContent=settings.mode==='ai'?`${count-1} AI · ${count} ships`:`${count} players`
+  const ship=SHIPS[settings.ship]
+  get('#hero-ship').innerHTML=settings.ship===0?`<img src="${menuHeroUrl}" alt="">`:shipPortrait(settings.ship)
+  get('#selected-ship').textContent=ship.name.toUpperCase()
+  for(const [attribute,value] of [['ship',settings.ship],['mode',settings.mode],['count',settings.players],['difficulty',settings.difficulty]] as const){
+    menu.querySelectorAll<HTMLButtonElement>(`[data-${attribute}]`).forEach(button=>button.setAttribute('aria-pressed',String(button.getAttribute(`data-${attribute}`)===String(value))))
   }
-  get('#mode-note').textContent=settings.mode==='ai'?'You are P1. Computer ships fight on their own turns. Last ship standing wins.':'Pass the device after each turn. Your selected ship is P1.'
+  get('#difficulty-setting').hidden=settings.mode!=='ai'
+  get('#players-label').textContent=settings.mode==='ai'?'OPPONENTS':'PLAYERS'
+  menu.querySelectorAll<HTMLButtonElement>('[data-count]').forEach(button=>{
+    const count=Number(button.dataset.count);button.textContent=settings.mode==='ai'?`${count-1} AI`:`${count} PLAYERS`
+  })
+  get('#mode-note').textContent=settings.mode==='ai'?'You vs computer opponents':'Pass and play on one device'
+  get('#total-ships').textContent=`${settings.players} ships total · ${settings.mode==='ai'?'You are Player 1':'Everyone takes turns'}`
   savePreferences(settings)
 }
 function updateAudio() {
@@ -79,21 +59,38 @@ function updateAudio() {
   }
   audio.update(settings); savePreferences(settings)
 }
-function menuVisible(visible: boolean) {
-  menu.hidden = !visible
-  app.inert = visible
-  app.setAttribute('aria-hidden', String(visible))
-  if(visible) get('#new-game').focus()
-  else get<HTMLButtonElement>('#main-menu')?.focus()
+function renderNavigation() {
+  const view=navigation.view,visible=view!=='battle'
+  menu.dataset.view=view;menu.hidden=!visible;menu.inert=false
+  for(const name of ['main','setup','pause'])get(`#${name}-view`).hidden=view!==name
+  app.inert=visible;app.setAttribute('aria-hidden',String(visible))
+  if(visible){audio.setScene('menu');get(view==='setup'?'#setup-back':view==='pause'?'#resume-game':'#new-game').focus()}
+  else{audio.setScene('battle');get<HTMLButtonElement>('#main-menu')?.focus()}
 }
-// Capture gameplay keys only while a menu/loading layer is present. Preserve Tab,
-// Enter and range-input keyboard behavior inside the menu and native dialogs.
-window.addEventListener('keydown', event => {
-  if(!menu.hidden || !overlay.hidden) {
-    if(event.key === 'Escape' && menu.hidden && !starting && !opening) showMenu()
-    event.stopPropagation()
+function showMain(){
+  engine?.pauseMatch();navigation.main();renderNavigation()
+}
+function showSetup(){
+  if(opening||starting)return
+  engine?.pauseMatch();audio.unlock();audio.click();navigation.setup();updateSelection();renderNavigation()
+}
+function showPause(){
+  if(!engineReady||!navigation.hasMatch||starting||opening)return
+  engine?.pauseMatch();navigation.pause();renderNavigation()
+}
+function resumeGame(){
+  if(!navigation.resume())return
+  audio.unlock();audio.click();renderNavigation();engine?.resumeMatch()
+}
+window.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&!starting&&!opening&&!options.open&&!exitDialog.open){
+    if(navigation.view==='battle')showPause()
+    else if(navigation.view==='setup'){navigation.back();renderNavigation()}
+    else if(navigation.view==='pause')resumeGame()
+    event.preventDefault();event.stopPropagation();return
   }
-}, true)
+  if(!menu.hidden||!overlay.hidden)event.stopPropagation()
+},true)
 function progress(value: number, message: string) {
   get('#loading-fill').style.width = `${value}%`
   get('#loading-progress').setAttribute('aria-valuenow', String(Math.round(value)))
@@ -105,14 +102,8 @@ async function artwork(id: string, url: string) {
   image.src = url
   try { await withDeadline(image.decode(), 15000) } catch { image.hidden = true }
 }
-function showMenu() {
-  if(engineReady)engine?.pauseMatch()
-  audio.setScene('menu')
-  get<HTMLButtonElement>('#continue-game').hidden = !hasMatch
-  menuVisible(true)
-}
 async function newGame() {
-  if(starting || opening)return
+  if(starting || opening || navigation.view!=='setup')return
   starting = true; audio.unlock(); audio.setScene('battle'); audio.click()
   get<HTMLButtonElement>('#loading-retry').hidden = true
   get<HTMLButtonElement>('#loading-back').hidden = true
@@ -123,14 +114,14 @@ async function newGame() {
     engine ??= await withDeadline(import('./main.ts'), 30000)
     progress(55,'Preparing arena...')
     await engine.gameReady
+    engineReady=true
     engine.startMatch(settings.ship,settings.players,settings.mode,settings.difficulty)
     engine.pauseMatch()
     progress(100,'Ready for battle')
     await new Promise(resolve=>window.setTimeout(resolve,250))
-    menu.inert = false; menuVisible(false)
+    navigation.start();menu.inert=false;renderNavigation()
     overlay.hidden = true; overlay.setAttribute('aria-busy','false')
-    engine.resumeMatch(); hasMatch = true
-    get('#main-menu').addEventListener('click', showMenu, {once:true})
+    engine.resumeMatch()
   } catch(error) {
     console.error('Game startup failed', error)
     status.textContent = 'Unable to start. Retry or return to menu.'
@@ -139,26 +130,32 @@ async function newGame() {
     overlay.setAttribute('aria-busy','false')
   } finally { starting = false; menu.inert = false }
 }
-get('#new-game').addEventListener('click',()=>void newGame())
-get('#continue-game').addEventListener('click',()=>{
-  audio.unlock(); audio.setScene('battle'); audio.click(); menuVisible(false);engine?.resumeMatch()
-  get('#main-menu').addEventListener('click',showMenu,{once:true})
-})
-get('#open-options').addEventListener('click',()=>{ audio.unlock(); audio.click();options.showModal() })
+get('#new-game').addEventListener('click',showSetup)
+get('#pause-new-game').addEventListener('click',showSetup)
+get('#setup-back').addEventListener('click',()=>{audio.click();navigation.back();renderNavigation()})
+get('#start-battle').addEventListener('click',()=>void newGame())
+get('#resume-game').addEventListener('click',resumeGame)
+get('#back-to-main').addEventListener('click',showMain)
+for(const id of ['#open-options','#pause-options'])get(id).addEventListener('click',()=>{audio.unlock();audio.click();options.showModal()})
 get('#close-options').addEventListener('click',()=>{audio.click();options.close()})
 get('#exit-game').addEventListener('click',()=>{audio.stop();exitDialog.showModal()})
 get('#stay-game').addEventListener('click',()=>{exitDialog.close();audio.unlock();audio.setScene('menu')})
-get('#previous-ship').addEventListener('click',()=>selectShip((settings.ship+3)%4))
-get('#next-ship').addEventListener('click',()=>selectShip((settings.ship+1)%4))
-function selectShip(index:number) { settings.ship=index;updateSelection();audio.unlock();audio.character() }
-menu.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(button=>button.addEventListener('click',()=>selectShip(Number(button.dataset.ship))))
-get<HTMLSelectElement>('#menu-players').addEventListener('change',event=>{settings.players=Number((event.target as HTMLSelectElement).value);savePreferences(settings)})
-get<HTMLSelectElement>('#menu-mode').addEventListener('change',event=>{
-  settings.mode=(event.target as HTMLSelectElement).value==='ai'?'ai':'local';updateSelection();audio.unlock();audio.click()
-})
-get<HTMLSelectElement>('#menu-difficulty').addEventListener('change',event=>{
-  const value=(event.target as HTMLSelectElement).value
-  settings.difficulty=value==='easy'?'easy':value==='hard'?'hard':'normal';updateSelection();audio.click()
+exitDialog.addEventListener('cancel',()=>{audio.unlock();audio.setScene('menu')})
+menu.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(button=>button.addEventListener('click',()=>{
+  settings.ship=Number(button.dataset.ship);updateSelection();audio.unlock();audio.character()
+}))
+menu.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
+  settings.mode=button.dataset.mode==='ai'?'ai':'local';updateSelection();audio.unlock();audio.click()
+}))
+menu.querySelectorAll<HTMLButtonElement>('[data-count]').forEach(button=>button.addEventListener('click',()=>{
+  settings.players=Number(button.dataset.count);updateSelection();audio.click()
+}))
+menu.querySelectorAll<HTMLButtonElement>('[data-difficulty]').forEach(button=>button.addEventListener('click',()=>{
+  const value=button.dataset.difficulty;settings.difficulty=value==='easy'?'easy':value==='hard'?'hard':'normal';updateSelection();audio.click()
+}))
+// The gameplay button is created once by the dynamic engine import.
+document.addEventListener('click',event=>{
+  if(event.target instanceof Element&&event.target.closest('#main-menu'))showPause()
 })
 get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.target as HTMLInputElement).checked;audio.unlock();updateAudio();audio.click()})
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
@@ -169,7 +166,7 @@ window.addEventListener('alien-war-impact',event=>{
 window.addEventListener('alien-war-turn',()=>audio.turn())
 window.addEventListener('alien-war-victory',()=>audio.victory())
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
-get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMenu()})
+get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMain()})
 updateSelection();updateAudio()
 menu.hidden=true;menu.inert=true;app.inert=true
 overlay.setAttribute('aria-busy','false')
@@ -199,7 +196,7 @@ async function loadOpening(){
     'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
     'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
-  const total=assets.length+3+SFX_ASSETS.length
+  const total=assets.length+6+SFX_ASSETS.length
   const downloaded=()=>{if(failed)return;completed++;status.textContent=`Downloading assets · ${completed}/${total}`}
   try {
     progress(1,'Downloading assets...')
@@ -212,7 +209,7 @@ async function loadOpening(){
     }
     progressFrame=requestAnimationFrame(animateProgress)
     const artworkTasks=[artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)].map(task=>task.then(downloaded))
-    const urls=[...assets.map(path=>`${import.meta.env.BASE_URL}assets/${path}`),...SFX_ASSETS]
+    const urls=[...assets.map(path=>`${import.meta.env.BASE_URL}assets/${path}`),...SFX_ASSETS,menuBackgroundUrl,menuHeroUrl,menuLogoUrl]
     const downloadTasks=urls.map(async path=>{
       const response=await fetch(path,{cache:'force-cache',signal:AbortSignal.timeout(90000)})
       if(!response.ok)throw new Error(`Asset download failed: ${path} (${response.status})`)
@@ -235,7 +232,7 @@ async function loadOpening(){
     opening=false;audio.setScene('menu');audio.finishLoading()
     overlay.hidden=true;overlay.setAttribute('aria-busy','false')
     get('#loading-music').hidden=true
-    menu.inert=false;menuVisible(true)
+    menu.inert=false;showMain()
   } catch(error) {
     failed=true
     window.cancelAnimationFrame(progressFrame)
