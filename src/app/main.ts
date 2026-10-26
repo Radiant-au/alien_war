@@ -14,7 +14,7 @@ app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien art
 <header class="hud" data-count="4">
 ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="player-name" title="${ship.name}">P${i+1}</span><div class="health-track" role="progressbar" aria-label="${ship.name} health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-${i}-bar"></i></div><strong id="health-${i}">100</strong></div>`).join('')}
 <div class="brand"><h1><span>Alien</span><br><b>War</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
-<nav class="utilities" aria-label="Match options"><label for="player-count" id="battle-mode">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="main-menu">☰ Menu</button><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
+<nav class="utilities" aria-label="Match options"><label for="player-count" id="battle-mode">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="main-menu">☰ Pause</button><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
 <section class="field-controls" aria-label="Battlefield controls">
   <button id="aim-wheel" aria-label="Drag aim wheel: farther increases power; direction changes angle. Arrow keys adjust; X reverses." title="Drag the wheel: direction = angle, distance = power. ↑ ↓ angle, ← → power, X reverse."><span class="wheel-disc"><span class="wheel-face"><span class="wheel-needle"></span><span class="wheel-knob"></span><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="1"/><path d="M24 8v8m0 16v8M8 24h8m16 0h8" stroke="currentColor" stroke-width="1.5"/></svg></span></span><span class="wheel-caption">DRAG AIM</span></button>
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
@@ -143,6 +143,6 @@ export function startMatch(ship:number,count:number,mode:GameMode='local',diffic
   if(scene.sys.isPaused())scene.scene.resume()
 }
 export function pauseMatch(){
-  resetWheel();scene.setGameplayEnabled(false);scene.scene.pause()
+  resetWheel();scene.setGameplayEnabled(false);if(!scene.sys.isPaused())scene.scene.pause()
 }
 export function resumeMatch(){scene.setGameplayEnabled(true);scene.scene.resume()}
