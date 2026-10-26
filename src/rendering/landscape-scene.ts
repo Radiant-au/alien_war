@@ -1,3 +1,4 @@
+import { CryoEffect } from './cryo.ts'
 import { AiController, computerTurn, type GameMode, type Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from '../game/aim.ts'
@@ -49,6 +50,7 @@ export class LandscapeScene extends Phaser.Scene {
   private crystals:Crystal[]=[]
   private burningUntil=new Map<number,number>()
   private terrainFire?:TerrainFire
+  private cryo?:CryoEffect
   private particles:Phaser.GameObjects.GameObject[]=[]
   private volleyShots:Shot[]=[]
   private volleyMissiles:Phaser.GameObjects.Sprite[]=[]
@@ -110,6 +112,7 @@ export class LandscapeScene extends Phaser.Scene {
       window.removeEventListener('blur',this.clearInputs);window.removeEventListener('pointerup',this.releasePointer);window.removeEventListener('pointercancel',this.releasePointer);document.removeEventListener('visibilitychange',this.visibility)
       this.clearMissile()
       this.terrainFire?.destroy();this.terrainFire=undefined
+      this.cryo=undefined
       for(const particle of this.particles){this.tweens.killTweensOf(particle);particle.destroy()}
       this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     })
@@ -174,7 +177,7 @@ export class LandscapeScene extends Phaser.Scene {
   }
   restart(count=this.match.players.length){
     this.ai.reset();this.audioTurn=-1;this.audioOutcome=false
-    this.terrainFire?.clear()
+    this.terrainFire?.clear();this.cryo?.clear()
     const variant=nextTerrainVariant(this.terrainVariants.get(count))
     this.terrainVariants.set(count,variant)
     this.clearInputs();this.clearMissile();this.burningUntil.clear();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count,variant);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
@@ -313,6 +316,7 @@ export class LandscapeScene extends Phaser.Scene {
     if(this.revision!==this.match.terrain.revision){this.drawTerrain();this.refreshTerrainEffects()}
     if(this.match.shot&&this.shotSpell.effect!=='fire'){this.trail.push({x:this.match.shot.x,y:this.match.shot.y});if(this.trail.length>18)this.trail.shift()}
     this.syncMissile()
+    this.cryo?.update(Math.min(delta,100)/1000,this.match.terrain,this.reducedMotion)
     this.terrainFire?.update(Math.min(delta,100)/1000,this.match.terrain)
     if(this.match.phase==='MovementAiming'){
       this.match.cameraZoom=overviewZoom(this.match.players,this.match.viewWidth)
@@ -353,7 +357,7 @@ export class LandscapeScene extends Phaser.Scene {
     if(fired&&this.elapsed-fired.time>=.65)this.recoil.delete(player.id)
     g.save();g.translateCanvas(pose.x+recoil.x,pose.y+recoil.y);g.rotateCanvas(tilt+recoil.angle);g.scaleCanvas(dir*SHIP_RENDER_SCALE,SHIP_RENDER_SCALE)
     const thrust=this.moving[kind]&&!this.reducedMotion?.5+Math.sin(this.elapsed*18)*.25:0
-    drawShip(g,kind,thrust);g.restore()
+    drawShip(g,kind,thrust);this.cryo?.drawShip(g,player.id,this.reducedMotion);g.restore()
     if((this.burningUntil.get(kind)??0)>this.elapsed){
       const flicker=this.reducedMotion?0:Math.sin(this.elapsed*19+kind*3),top=pose.y-24+flicker*2
       g.fillStyle(0xff6029,.85);g.fillTriangle(pose.x-20,top+21,pose.x-10,top-4-Math.abs(flicker)*3,pose.x-3,top+22)
@@ -402,10 +406,10 @@ export class LandscapeScene extends Phaser.Scene {
   private impact(x:number,spell:Spell,target:'terrain'|number){
     window.dispatchEvent(new CustomEvent('alien-war-impact',{detail:{effect:spell.effect,pan:x/WORLD_WIDTH*2-1}}))
     if(spell.effect==='fire'&&target!=='terrain'&&this.match.players[target]?.health>0)this.burningUntil.set(target,this.elapsed+2.4)
-    if(!this.reducedMotion&&spell.effect!=='poison')this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
+    if(!this.reducedMotion&&spell.effect!=='poison'&&spell.effect!=='ice')this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
     const radius=spell.radius,depth=2
     const groundY=surfaceAt(this.match.terrain,x)
-    if(spell.effect!=='poison'){
+    if(spell.effect!=='poison'&&spell.effect!=='ice'){
     const flash=this.add.circle(x,groundY,radius*.16,0xffffff,.8).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD)
     this.animateEffect(flash,{radius:radius*1.3,alpha:0,duration:this.reducedMotion?140:250,ease:'Cubic.Out'})
     const ring=this.add.graphics().setPosition(x,groundY).setDepth(depth)
@@ -437,17 +441,9 @@ export class LandscapeScene extends Phaser.Scene {
         this.risingParticle(bubbleX,surfaceAt(this.match.terrain,bubbleX),0x39ff14,radius,Math.floor(i/2)*260,4+Math.random()*3)
       }
     }else{
-      const frost=this.surfacePatch(x,groundY,radius*.9,0x80e5ff,.35,0x1a5e7a,.9,2,8,true).setDepth(depth-1)
-      this.animateEffect(frost,{alpha:0,scaleY:.7,duration:this.reducedMotion?350:3300,delay:this.reducedMotion?0:2200})
-      for(let i=0;i<8;i++){
-        const height=radius*(.9+Math.random()*.75),offset=(i/7-.5)*radius*1.8
-        const shardX=x+offset,shardY=surfaceAt(this.match.terrain,shardX)
-        const shard=this.add.graphics().setPosition(shardX,shardY).setDepth(depth)
-        this.anchorToTerrain(shard,shardX,0)
-        shard.fillStyle(0x99f2ff,.98);shard.lineStyle(3,0x1a5e7a,1);shard.beginPath();shard.moveTo(0,-height);shard.lineTo(height*.34,0);shard.lineTo(-height*.34,0);shard.closePath();shard.fillPath();shard.strokePath();shard.setScale(1,.01)
-        this.animateEffect(shard,{scaleY:1,alpha:0,delay:this.reducedMotion?0:i*65+(this.reducedMotion?0:1900),duration:this.reducedMotion?180:500})
-      }
-      if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xb3f6ff,radius*.8)
+      this.cryo??=new CryoEffect(this)
+      const hitY=target==='terrain'?groundY:this.match.players[target].y
+      this.cryo.impact(this.match.players,x,hitY,radius)
     }
   }
   private surfacePatch(x:number,y:number,radius:number,fillColor:number,fillAlpha:number,strokeColor:number,strokeAlpha:number,strokeWidth:number,thickness:number,followTerrain:boolean){
