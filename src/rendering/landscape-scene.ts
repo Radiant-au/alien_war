@@ -1,3 +1,4 @@
+import cryoSpikesUrl from '../../assets/effects/cryo-spikes.webp'
 import { CryoEffect } from './cryo.ts'
 import { AiController, computerTurn, type GameMode, type Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
@@ -72,6 +73,7 @@ export class LandscapeScene extends Phaser.Scene {
   constructor(){super('battlefield')}
   setHud(callback:(hud:BattleHud)=>void){this.hud=callback}
   preload(){
+    this.load.image('cryo-spikes',cryoSpikesUrl)
     this.load.spritesheet('fire-impact','/assets/fire_explosion_32_grid.png',{frameWidth:256,frameHeight:256})
     this.load.spritesheet('electric-impact','/assets/electric_weapon_16.png',{frameWidth:256,frameHeight:256})
     for(const type of ['ice','poison','electric','fire'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
