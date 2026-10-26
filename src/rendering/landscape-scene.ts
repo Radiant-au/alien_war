@@ -1,3 +1,4 @@
+import { AiController, computerTurn, type GameMode, type Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from '../game/aim.ts'
 import { WORLD_WIDTH } from '../game/config.ts'
@@ -23,6 +24,14 @@ const MISSILE_TEXTURES:Record<Spell['effect'],string>={
 }
 
 export class LandscapeScene extends Phaser.Scene {
+  mode:GameMode='local'
+  difficulty:Difficulty='normal'
+  private ai=new AiController()
+  private audioTurn=-1
+  private audioOutcome=false
+  get isComputerTurn(){return computerTurn(this.mode,this.match.active)}
+  get humanReady(){return this.gameplayEnabled&&!this.isComputerTurn&&this.match.phase==='MovementAiming'}
+  configure(mode:GameMode,difficulty:Difficulty){this.mode=mode;this.difficulty=difficulty;this.ai.reset()}
   gameplayEnabled=false
   shipKinds=[0,1,2,3]
   onStartupReady=()=>{}
@@ -105,19 +114,19 @@ export class LandscapeScene extends Phaser.Scene {
       this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     })
   }
-  selectSpell(index:number){if(this.match.phase==='MovementAiming')this.selectedSpell=Math.max(0,Math.min(SPELLS.length-1,index))}
+  selectSpell(index:number){if(this.humanReady)this.selectedSpell=Math.max(0,Math.min(SPELLS.length-1,index))}
   aim(elevation:number,power:number){
-    if(this.match.phase!=='MovementAiming')return
+    if(!this.humanReady)return
     const player=this.match.players[this.match.active],angle=-elevation*Math.PI/180
     player.aimAngle=Math.cos(player.aimAngle)>=0?angle:Math.PI-angle;player.power=power/100;this.lastAimTime=this.elapsed
   }
   beginAim(pointer:number){
-    if(this.match.phase!=='MovementAiming'||this.match.pointerId!==undefined)return false
+    if(!this.humanReady||this.match.pointerId!==undefined)return false
     this.match.pointerId=pointer;this.lastAimTime=this.elapsed
     return true
   }
   dragWheel(dx:number,dy:number,reach:number){
-    if(this.match.phase!=='MovementAiming'||this.match.pointerId===undefined)return
+    if(!this.humanReady||this.match.pointerId===undefined)return
     this.lastAimTime=this.elapsed
     // A center tap reveals the values without changing the previous shot setup.
     if(Math.hypot(dx,dy)<6)return
@@ -129,15 +138,15 @@ export class LandscapeScene extends Phaser.Scene {
     this.match.pointerId=undefined
   }
   flipAim(){
-    if(this.match.phase==='MovementAiming'){
+    if(this.humanReady){
       const player=this.match.players[this.match.active];player.aimAngle=Math.PI-player.aimAngle;this.lastAimTime=this.elapsed
     }
   }
-  hold(pointer:number,axis:-1|1){if(this.match.phase==='MovementAiming')this.held.set(pointer,axis)}
+  hold(pointer:number,axis:-1|1){if(this.humanReady)this.held.set(pointer,axis)}
   private releasePointer=(e:PointerEvent)=>{this.held.delete(e.pointerId)}
   private visibility=()=>{if(document.hidden)this.clearInputs()}
   private keyDown=(event:KeyboardEvent)=>{
-    if(!this.gameplayEnabled)return
+    if(!this.humanReady)return
     if(event.target instanceof HTMLElement&&event.target.closest('input,select,button'))return
     if(['KeyA','KeyD','ArrowLeft','ArrowRight'].includes(event.code)){
       event.preventDefault();this.keys.add(event.code)
@@ -149,11 +158,12 @@ export class LandscapeScene extends Phaser.Scene {
     this.gameplayEnabled=enabled
     if(!enabled)this.clearInputs()
   }
-  cast(){
+  cast(){if(this.humanReady)this.fireWeapon()}
+  private fireWeapon(){
     if(!this.gameplayEnabled)return
     if(!fire(this.match))return
-    window.dispatchEvent(new Event('alien-war-shot'))
     const shooter=this.match.players[this.match.active]
+    window.dispatchEvent(new CustomEvent('alien-war-shot',{detail:{pan:shooter.x/WORLD_WIDTH*2-1}}))
     this.recoil.set(shooter.id,{time:this.elapsed,angle:shooter.aimAngle,power:shooter.power})
     this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()
     this.volleyShots=this.shotSpell.effect==='electric'?createSpreadShots(shooter):[this.match.shot!]
@@ -163,6 +173,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.syncMissile()
   }
   restart(count=this.match.players.length){
+    this.ai.reset();this.audioTurn=-1;this.audioOutcome=false
     this.terrainFire?.clear()
     const variant=nextTerrainVariant(this.terrainVariants.get(count))
     this.terrainVariants.set(count,variant)
@@ -265,12 +276,19 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private polygon(ctx:CanvasRenderingContext2D,points:number[][],color:string){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=color;ctx.fill()}
   update(_time:number,delta:number){
+    if(!this.gameplayEnabled)return
     this.elapsed+=Math.min(delta,100)/1000
+    const aiAction=this.isComputerTurn?this.ai.tick(this.match,this.difficulty,Math.min(delta,100)/1000):{axis:0 as const}
+    if('plan' in aiAction&&aiAction.plan){
+      const p=this.match.players[this.match.active]
+      p.aimAngle=aiAction.plan.angle;p.power=aiAction.plan.power;this.selectedSpell=aiAction.plan.spell;this.lastAimTime=this.elapsed
+      if(aiAction.fire)this.fireWeapon()
+    }
     this.stepAccumulator=Math.min(this.stepAccumulator+Math.min(delta,100)/1000,STEP_SECONDS*12)
     const editing=document.activeElement instanceof HTMLInputElement||document.activeElement instanceof HTMLSelectElement
     const left=(!editing&&(this.keys.has('KeyA')||this.keys.has('ArrowLeft')))||[...this.held.values()].includes(-1)
     const right=(!editing&&(this.keys.has('KeyD')||this.keys.has('ArrowRight')))||[...this.held.values()].includes(1)
-    const axis=this.match.pointerId!==undefined||left===right?0:left?-1:1
+    const axis=this.isComputerTurn?aiAction.axis:this.match.pointerId!==undefined||left===right?0:left?-1:1
     const beforePhase=this.match.phase
     while(this.stepAccumulator>=STEP_SECONDS){
       if(this.match.phase==='ProjectileFlight'&&this.volleyShots.length){
@@ -299,6 +317,8 @@ export class LandscapeScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.scale.width/960*this.match.cameraZoom)
       this.baseScrollY=300-this.cameras.main.height*.72/this.cameras.main.zoom
     }
+    if(this.match.phase==='MovementAiming'&&this.audioTurn!==this.match.active){this.audioTurn=this.match.active;window.dispatchEvent(new Event('alien-war-turn'))}
+    if(this.match.phase==='GameOver'&&!this.audioOutcome){this.audioOutcome=true;window.dispatchEvent(new Event('alien-war-victory'))}
     this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell,aimFeedback:this.aimFeedback()})
   }
   private aimFeedback(){
@@ -373,6 +393,7 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private clearMissile(){for(const missile of this.volleyMissiles)missile.destroy();this.volleyMissiles=[];this.volleyShots=[]}
   private impact(x:number,spell:Spell,target:'terrain'|number){
+    window.dispatchEvent(new CustomEvent('alien-war-impact',{detail:{effect:spell.effect,pan:x/WORLD_WIDTH*2-1}}))
     if(spell.effect==='fire'&&target!=='terrain'&&this.match.players[target]?.health>0)this.burningUntil.set(target,this.elapsed+2.4)
     if(!this.reducedMotion)this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
     const radius=spell.radius,depth=2

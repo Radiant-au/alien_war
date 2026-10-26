@@ -1,10 +1,13 @@
-export interface Preferences { ship: number; players: number; sound: boolean; music: number; sfx: number }
-export const defaults: Preferences = { ship: 0, players: 4, sound: true, music: 70, sfx: 85 }
+import type { GameMode, Difficulty } from '../game/ai.ts'
+export interface Preferences { ship: number; players: number; mode: GameMode; difficulty: Difficulty; sound: boolean; music: number; sfx: number }
+export const defaults: Preferences = { ship: 0, players: 4, mode: 'local', difficulty: 'normal', sound: true, music: 70, sfx: 85 }
 export function normalizePreferences(raw: Partial<Preferences> = {}): Preferences {
   const volume = (v: unknown, fallback: number) => typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : fallback
   return {
     ship: Number.isInteger(raw.ship) && raw.ship! >= 0 && raw.ship! < 4 ? raw.ship! : 0,
     players: [2,3,4].includes(raw.players!) ? raw.players! : 4,
+    mode: raw.mode === 'ai' ? 'ai' : 'local',
+    difficulty: raw.difficulty === 'easy' || raw.difficulty === 'hard' ? raw.difficulty : 'normal',
     sound: typeof raw.sound === 'boolean' ? raw.sound : true,
     music: volume(raw.music, defaults.music), sfx: volume(raw.sfx, defaults.sfx),
   }

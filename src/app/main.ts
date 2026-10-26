@@ -1,3 +1,4 @@
+import type { GameMode, Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
 import '../styles/style.css'
 import { backgroundMarkup } from '../rendering/background.ts'
@@ -13,7 +14,7 @@ app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien art
 <header class="hud" data-count="4">
 ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="player-name" title="${ship.name}">P${i+1}</span><div class="health-track" role="progressbar" aria-label="${ship.name} health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-${i}-bar"></i></div><strong id="health-${i}">100</strong></div>`).join('')}
 <div class="brand"><h1><span>Alien</span><br><b>War</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
-<nav class="utilities" aria-label="Match options"><label for="player-count">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="main-menu">☰ Menu</button><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
+<nav class="utilities" aria-label="Match options"><label for="player-count" id="battle-mode">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="main-menu">☰ Menu</button><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
 <section class="field-controls" aria-label="Battlefield controls">
   <button id="aim-wheel" aria-label="Drag aim wheel: farther increases power; direction changes angle. Arrow keys adjust; X reverses." title="Drag the wheel: direction = angle, distance = power. ↑ ↓ angle, ← → power, X reverse."><span class="wheel-disc"><span class="wheel-face"><span class="wheel-needle"></span><span class="wheel-knob"></span><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="8" fill="none" stroke="currentColor" stroke-width="1"/><path d="M24 8v8m0 16v8M8 24h8m16 0h8" stroke="currentColor" stroke-width="1.5"/></svg></span></span><span class="wheel-caption">DRAG AIM</span></button>
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
@@ -81,7 +82,7 @@ let healthAnimationTime=performance.now()
 scene.setHud(({match,spell,aimFeedback})=>{
   const now=performance.now(),healthTicks=now-healthAnimationTime>=24?1:0
   if(healthTicks)healthAnimationTime=now
-  const ready=scene.gameplayEnabled&&match.phase==='MovementAiming',player=match.players[match.active]
+  const ready=scene.humanReady,player=match.players[match.active]
   if(!ready&&aimPointer!==undefined)resetWheel()
   aimWheel.disabled=!ready
   aimWheel.style.setProperty('--wheel-progress',`${player.power*360}deg`)
@@ -103,6 +104,7 @@ scene.setHud(({match,spell,aimFeedback})=>{
     const ship=SHIPS[scene.shipKinds[i]]
     card.style.setProperty('--ship-color','#'+ship.color.toString(16))
     card.querySelector('.player-name')!.setAttribute('title',ship.name)
+    card.querySelector('.player-name')!.textContent=scene.mode==='ai'&&i>0?`AI${i}`:`P${i+1}`
     const p=match.players[i];card.hidden=!p
     if(!p)return
     if(p.health>displayedHealth[i])displayedHealth[i]=p.health
@@ -112,7 +114,7 @@ scene.setHud(({match,spell,aimFeedback})=>{
     card.title=p.health>0?`${SHIPS[scene.shipKinds[i]].name}: ${shownHealth} health`:`${SHIPS[scene.shipKinds[i]].name}: eliminated`
     document.querySelector<HTMLElement>(`#health-${i}-bar`)!.style.width=`${shownHealth}%`
     card.querySelector('.health-track')!.setAttribute('aria-valuenow',String(shownHealth))
-    card.classList.toggle('active',match.active===i&&ready);card.classList.toggle('eliminated',p.health<=0)
+    card.classList.toggle('active',match.active===i&&scene.gameplayEnabled&&match.phase==='MovementAiming');card.classList.toggle('eliminated',p.health<=0)
   })
   const fuel=Math.max(0,Math.min(100,player.movementRemaining/MOVEMENT_ALLOWANCE*100))
   document.querySelector('#fuel-value')!.textContent=`${Math.round(fuel)}%`
@@ -120,15 +122,20 @@ scene.setHud(({match,spell,aimFeedback})=>{
   document.querySelector('#fuel-meter')!.setAttribute('aria-valuenow',String(Math.round(fuel)))
   document.querySelector<HTMLElement>('.movement-controls')!.style.setProperty('--fuel-color','#'+SHIPS[scene.shipKinds[player.id]].color.toString(16))
   const winner=match.outcome?.match(/^Player (\d+) wins$/)
-  const result=winner?`${SHIPS[scene.shipKinds[Number(winner[1])-1]].name} wins!`:match.outcome
-  document.querySelector('#turn-status')!.textContent=result??(ready?`P${player.id+1} · ${SHIPS[scene.shipKinds[player.id]].name}'s turn` : match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
+  const result=winner?`${scene.mode==='ai'&&Number(winner[1])>1?'Computer · ':''}${SHIPS[scene.shipKinds[Number(winner[1])-1]].name} wins!`:match.outcome
+  document.querySelector('#turn-status')!.textContent=result??(ready?`P${player.id+1} · ${SHIPS[scene.shipKinds[player.id]].name}'s turn` : match.phase==='MovementAiming'&&scene.isComputerTurn?`AI${player.id} · ${scene.difficulty} · thinking…`:match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
   document.querySelector<HTMLButtonElement>('#fire')!.disabled=!ready||!player.grounded||player.health===0||match.pointerId!==undefined
   for(const id of ['move-left','move-right'])document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled=!ready||player.movementRemaining<=0
 })
 
 
-export function startMatch(ship:number,count:number){
+export function startMatch(ship:number,count:number,mode:GameMode='local',difficulty:Difficulty='normal'){
   resetWheel()
+  scene.configure(mode,difficulty)
+  document.querySelector('#battle-mode')!.textContent=mode==='ai'?'VS AI':'LOCAL'
+  for(const option of document.querySelector<HTMLSelectElement>('#player-count')!.options){
+    option.textContent=mode==='ai'?`${Number(option.value)-1} AI`:`${option.value} players`
+  }
   scene.shipKinds=shipOrder(ship)
   document.querySelector<HTMLSelectElement>('#player-count')!.value=String(count)
   scene.restart(count)
