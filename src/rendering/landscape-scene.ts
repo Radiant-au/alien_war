@@ -1,11 +1,11 @@
 import { AiController, computerTurn, type GameMode, type Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from '../game/aim.ts'
-import { WORLD_WIDTH } from '../game/config.ts'
+import { WORLD_WIDTH, SHIP_RENDER_SCALE } from '../game/config.ts'
 import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, type Match } from '../game/match.ts'
 import { createShot, createSpreadShots, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory, type Shot } from '../game/projectile.ts'
 import { nextTerrainVariant, surfaceAt, type Player } from '../game/terrain.ts'
-import { SPELLS, type Spell } from '../game/spells.ts'
+import { SPELLS, weaponBlast, type Spell } from '../game/spells.ts'
 import { TerrainFire } from '../terrain-fire.ts'
 import { drawShip, SHIPS } from './ships.ts'
 import { shipPose, shotRecoil } from './ship-motion.ts'
@@ -296,7 +296,7 @@ export class LandscapeScene extends Phaser.Scene {
           const result=stepShot(this.volleyShots[i],this.match.terrain,this.match.players,STEP_SECONDS*PROJECTILE_SPEED_MULTIPLIER)
           if(!result)continue
           if(result.kind==='impact'){
-            const blast=this.shotSpell.effect==='electric'?{...this.shotSpell,damage:this.shotSpell.damage/3}:this.shotSpell
+            const blast=weaponBlast(this.shotSpell)
             applyShotResult(this.match,result,blast);this.impact(result.x,this.shotSpell,result.target)
           }
           this.volleyShots.splice(i,1);this.volleyMissiles.splice(i,1)[0]?.destroy()
@@ -337,19 +337,19 @@ export class LandscapeScene extends Phaser.Scene {
     this.tilts[kind]=tilt
     if(player.grounded){
       g.save();g.translateCanvas(player.x,pose.groundY);g.rotateCanvas(tilt)
-      g.fillStyle(0x08162b,.22);g.fillEllipse(0,0,48,7)
+      g.fillStyle(0x08162b,.22);g.fillEllipse(0,0,58,8)
       for(let i=0;i<2;i++){
         const pulse=(pose.pulse+i*.5)%1
-        g.lineStyle(1.5,color,(1-pulse)*.40);g.strokeEllipse(0,-1,44+pulse*64,6+pulse*12)
+        g.lineStyle(1.5,color,(1-pulse)*.40);g.strokeEllipse(0,-1,52+pulse*76,7+pulse*14)
       }
       g.restore()
       g.fillStyle(color,this.reducedMotion?.16:.16+Math.sin(this.elapsed*4+kind)*.08)
-      g.fillEllipse(pose.x,pose.y+18,42,13)
+      g.fillEllipse(pose.x,pose.y+22,50,15)
     }
     const fired=this.recoil.get(player.id)
     const recoil=fired?shotRecoil(this.elapsed-fired.time,fired.angle,fired.power,this.reducedMotion):{x:0,y:0,angle:0}
     if(fired&&this.elapsed-fired.time>=.65)this.recoil.delete(player.id)
-    g.save();g.translateCanvas(pose.x+recoil.x,pose.y+recoil.y);g.rotateCanvas(tilt+recoil.angle);g.scaleCanvas(dir*1.5,1.5)
+    g.save();g.translateCanvas(pose.x+recoil.x,pose.y+recoil.y);g.rotateCanvas(tilt+recoil.angle);g.scaleCanvas(dir*SHIP_RENDER_SCALE,SHIP_RENDER_SCALE)
     const thrust=this.moving[kind]&&!this.reducedMotion?.5+Math.sin(this.elapsed*18)*.25:0
     drawShip(g,kind,thrust);g.restore()
     if((this.burningUntil.get(kind)??0)>this.elapsed){
@@ -360,12 +360,12 @@ export class LandscapeScene extends Phaser.Scene {
       g.fillTriangle(pose.x+7,top+20,pose.x+12,top+4-flicker*2,pose.x+16,top+19)
     }
     // The weapon keeps the world-space aim angle while the hull follows the slope.
-    g.save();g.translateCanvas(player.x+recoil.x,pose.y+4+recoil.y);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.3,1.3)
+    g.save();g.translateCanvas(player.x+recoil.x,pose.y+4+recoil.y);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.5,1.5)
     g.fillStyle(0x172941);g.fillRoundedRect(5,-4,24,8,3)
     g.fillStyle(color);g.fillRect(9,-2,21,4);g.fillStyle(0xdfffff);g.fillEllipse(29,0,3,7)
     g.restore()
     if(player.id===this.match.active&&this.match.phase==='MovementAiming'){
-      g.fillStyle(color,.9);g.fillTriangle(player.x-5,pose.y-38,player.x+5,pose.y-38,player.x,pose.y-32)
+      g.fillStyle(color,.9);g.fillTriangle(player.x-5,pose.y-45,player.x+5,pose.y-45,player.x,pose.y-39)
     }
   }
   private drawActors(dt:number){
