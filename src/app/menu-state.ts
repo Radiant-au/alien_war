@@ -1,4 +1,4 @@
-export type MenuView='main'|'setup'|'pause'|'battle'
+export type MenuView='main'|'setup'|'pause'|'battle'|'result'
 /** Navigation state is separate from the running match and saved configuration. */
 export class MenuNavigation {
   view:MenuView='main'
@@ -9,5 +9,7 @@ export class MenuNavigation {
   start(){if(this.view!=='setup')return false;this.hasMatch=true;this.view='battle';return true}
   pause(){if(this.view==='battle'&&this.hasMatch)this.view='pause'}
   resume(){if(this.view!=='pause'||!this.hasMatch)return false;this.view='battle';return true}
+  finish(){if(this.view==='battle'&&this.hasMatch)this.view='result'}
+  replay(){if(this.view!=='result'||!this.hasMatch)return false;this.view='battle';return true}
   main(){this.hasMatch=false;this.view='main'}
 }

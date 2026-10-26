@@ -77,3 +77,17 @@
 @media(max-width:380px){.count-choices .choice,.difficulty-choices .choice{font-size:14px;padding:10px 3px}.setup-settings,.setup-ships{padding:15px}.setup-card h3{font-size:17px}.ship-choices{gap:5px}.ship-choices .choice{font-size:9px}.start-battle{font-size:21px;gap:16px}.setup-header h2{font-size:29px}}
 
 .ship-choices img{object-fit:contain;display:block}
+
+/* Results keep the completed battlefield visible behind the modal. */
+#main-menu-screen[data-view="result"]{background:rgba(5,8,28,.64);backdrop-filter:blur(3px)}
+#main-menu-screen[data-view="result"]>.menu-backdrop,#main-menu-screen[data-view="result"]>.menu-vignette,#main-menu-screen[data-view="result"]>.menu-sparks{display:none}
+.result-page{min-height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box}
+.result-page[hidden]{display:none}
+.result-card{box-sizing:border-box;width:min(530px,100%);padding:30px 40px;text-align:center;border:2px solid #55eaff;border-radius:28px;background:linear-gradient(145deg,rgba(8,25,48,.97),rgba(19,16,52,.96));box-shadow:0 0 35px #7836de55;color:#fff}
+.result-eyebrow{color:#66dff6;letter-spacing:.22em;font-size:14px;margin:0 0 18px}.result-card h2{font-size:clamp(26px,4vw,40px);margin:0;text-shadow:0 3px #12627b}
+.result-ship{height:190px;display:grid;place-items:center;filter:drop-shadow(0 0 20px #35dbff66)}.result-ship img,.result-ship svg{width:100%;height:100%;max-width:280px;object-fit:contain}.result-card p#result-caption{color:#bfcbe0;margin:4px 0 24px}.result-card .menu-button{width:100%;margin-top:12px;justify-content:center;min-height:60px}
+@media(max-height:600px){.result-page{padding:12px}.result-card{padding:16px 24px}.result-ship{height:100px}.result-eyebrow{margin-bottom:8px}.result-card p#result-caption{margin:0 0 8px}.result-card .menu-button{min-height:46px;margin-top:8px}}
+@media(prefers-reduced-motion:reduce){.result-ship{animation:none}}
+.result-ship{position:relative;overflow:hidden;pointer-events:none}.result-ship img,.result-ship svg{position:absolute;inset:0;margin:auto;max-height:100%;max-width:100%}
+.result-card #play-again{background:linear-gradient(#1ce5f5,#00bedf);border-color:#8bffff;box-shadow:0 0 18px #08cbe94d,inset 0 0 0 2px #00a7c8;color:#071c35;text-shadow:none}
+.result-card #result-main-menu{border-color:#b38aff;background:linear-gradient(#292046,#151a38);box-shadow:0 0 12px #9c60ef33;color:#fff}

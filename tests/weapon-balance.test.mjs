@@ -6,14 +6,14 @@ import { explosionDamage } from '../src/game/terrain.ts'
 import { PLAYER_WIDTH, PLAYER_HEIGHT, SHIP_RENDER_SCALE } from '../src/game/config.ts'
 import { createShot, sweepShot } from '../src/game/projectile.ts'
 
-test('a complete weapon shot removes at most 24–32 health, not 55–70',()=>{
-  const budgets=[24,26,30,32]
+test('a complete weapon shot removes at most 48–60 direct health with acid reserved for gradual damage',()=>{
+  const budgets=[48,0,56,60]
   for(let i=0;i<SPELLS.length;i++){
     const match=createMatch(),target=match.players[1],spell=SPELLS[i],blast=weaponBlast(spell)
     const pellets=spell.effect==='electric'?3:1
     for(let p=0;p<pellets;p++)applyShotResult(match,{kind:'impact',x:target.x,y:target.y,target:target.id},blast)
     assert.equal(100-target.health,budgets[i])
-    assert.ok(Math.ceil(100/budgets[i])>=4)
+    if(i===1)assert.equal(match.poisons[0].remaining,20)
   }
 })
 test('splash falls off continuously outside the enlarged collision body',()=>{
@@ -36,3 +36,4 @@ test('larger ships have matching collision dimensions and still launch outside t
     assert.notEqual(result?.kind==='impact'?result.target:undefined,player.id)
   }
 })
+

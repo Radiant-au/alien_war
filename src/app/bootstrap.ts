@@ -63,9 +63,9 @@ function updateAudio() {
 function renderNavigation() {
   const view=navigation.view,visible=view!=='battle'
   menu.dataset.view=view;menu.hidden=!visible;menu.inert=false
-  for(const name of ['main','setup','pause'])get(`#${name}-view`).hidden=view!==name
+  for(const name of ['main','setup','pause','result'])get(`#${name}-view`).hidden=view!==name
   app.inert=visible;app.setAttribute('aria-hidden',String(visible))
-  if(visible){audio.setScene('menu');get(view==='setup'?'#setup-back':view==='pause'?'#resume-game':'#new-game').focus()}
+  if(visible){audio.setScene('menu');get(view==='result'?'#play-again':view==='setup'?'#setup-back':view==='pause'?'#resume-game':'#new-game').focus()}
   else{audio.setScene('battle');get<HTMLButtonElement>('#main-menu')?.focus()}
 }
 function showMain(){
@@ -76,6 +76,7 @@ function showSetup(){
   engine?.pauseMatch();audio.unlock();audio.click();navigation.setup();updateSelection();renderNavigation()
 }
 function showPause(){
+  if(navigation.view!=='battle')return
   if(!engineReady||!navigation.hasMatch||starting||opening)return
   engine?.pauseMatch();navigation.pause();renderNavigation()
 }
@@ -165,7 +166,23 @@ window.addEventListener('alien-war-impact',event=>{
   const detail=(event as CustomEvent).detail;audio.impact(detail?.effect,detail?.pan??0)
 })
 window.addEventListener('alien-war-turn',()=>audio.turn())
-window.addEventListener('alien-war-victory',()=>audio.victory())
+window.addEventListener('alien-war-victory',event=>{
+  audio.victory()
+  if(navigation.view!=='battle'||!engine)return
+  const detail=(event as CustomEvent).detail
+  navigation.finish();engine.pauseMatch()
+  const winner=detail?.winner as number|undefined
+  get('#result-title').textContent=winner===undefined?'DRAW!':`${detail.mode==='ai'&&winner>0?'COMPUTER '+winner:'PLAYER '+(winner+1)} WINS!`
+  const ship=winner===undefined?undefined:detail.shipKinds[winner]
+  get('#result-ship').innerHTML=ship===undefined?'✦':`<img src="${SHIP_ART[ship]}" alt="">`
+  get('#result-caption').textContent=winner===undefined?'An evenly matched battle':'Nice shot, Commander'
+  renderNavigation()
+})
+get('#play-again').addEventListener('click',()=>{
+  if(!engine||!navigation.replay())return
+  audio.unlock();audio.click();engine.scene.restart();renderNavigation();engine.resumeMatch()
+})
+get('#result-main-menu').addEventListener('click',showMain)
 get('#loading-retry').addEventListener('click',()=>window.location.reload())
 get('#loading-back').addEventListener('click',()=>{opening=false;audio.setScene('menu');audio.finishLoading();overlay.hidden=true;showMain()})
 updateSelection();updateAudio()

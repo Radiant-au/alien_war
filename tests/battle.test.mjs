@@ -23,7 +23,7 @@ test('each spell uses its blast radius and damage, then gives the next player a 
     const edge=Math.round(x+spell.radius-1),before=match.terrain.heights[edge]
     assert.equal(fire(match),true)
     resolveShot(match,{kind:'impact',x,y,target:0},spell)
-    assert.equal(player.health,100-spell.damage)
+    assert.equal(player.health,spell.effect==='poison'?100:100-spell.damage)
     assert.ok(match.terrain.heights[Math.round(x)]>y)
     // Beyond the radius the collision heightmap is unchanged.
     const outside=Math.ceil(x+spell.radius+2)

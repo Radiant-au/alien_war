@@ -304,7 +304,9 @@ export class LandscapeScene extends Phaser.Scene {
         if(this.volleyShots.length)this.match.shot=this.volleyShots[0]
         else {finishShot(this.match);this.trail=[];this.clearMissile()}
       }
-      updateMatch(this.match,STEP_SECONDS,axis);this.stepAccumulator-=STEP_SECONDS
+      updateMatch(this.match,STEP_SECONDS,axis)
+      for(const id of this.match.damageTicks)this.poisonTick(id)
+      this.stepAccumulator-=STEP_SECONDS
     }
     if(beforePhase!==this.match.phase)this.clearInputs()
     this.match.players.forEach((p,i)=>{this.moving[i]=Math.abs(p.x-this.previousX[i])>.001;this.previousX[i]=p.x})
@@ -318,7 +320,7 @@ export class LandscapeScene extends Phaser.Scene {
       this.baseScrollY=300-this.cameras.main.height*.72/this.cameras.main.zoom
     }
     if(this.match.phase==='MovementAiming'&&this.audioTurn!==this.match.active){this.audioTurn=this.match.active;window.dispatchEvent(new Event('alien-war-turn'))}
-    if(this.match.phase==='GameOver'&&!this.audioOutcome){this.audioOutcome=true;window.dispatchEvent(new Event('alien-war-victory'))}
+    if(this.match.phase==='GameOver'&&!this.audioOutcome){this.audioOutcome=true;window.dispatchEvent(new CustomEvent('alien-war-victory',{detail:{outcome:this.match.outcome,winner:this.match.players.find(p=>p.health>0)?.id,shipKinds:[...this.shipKinds],mode:this.mode}}))}
     this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell,aimFeedback:this.aimFeedback()})
   }
   private aimFeedback(){
@@ -392,17 +394,24 @@ export class LandscapeScene extends Phaser.Scene {
     })
   }
   private clearMissile(){for(const missile of this.volleyMissiles)missile.destroy();this.volleyMissiles=[];this.volleyShots=[]}
+  private poisonTick(id:number){
+    const player=this.match.players[id],zoom=this.cameras.main.zoom
+    const tick=this.add.text(player.x,player.y-52,'−1',{fontFamily:'Arial, sans-serif',fontSize:`${Math.round(22/zoom)}px`,fontStyle:'bold',color:'#b0ff57',stroke:'#152c24',strokeThickness:3/zoom}).setOrigin(.5).setDepth(20)
+    this.animateEffect(tick,{y:tick.y-(this.reducedMotion?8:34)/zoom,alpha:0,duration:this.reducedMotion?250:650,ease:'Cubic.Out'})
+  }
   private impact(x:number,spell:Spell,target:'terrain'|number){
     window.dispatchEvent(new CustomEvent('alien-war-impact',{detail:{effect:spell.effect,pan:x/WORLD_WIDTH*2-1}}))
     if(spell.effect==='fire'&&target!=='terrain'&&this.match.players[target]?.health>0)this.burningUntil.set(target,this.elapsed+2.4)
-    if(!this.reducedMotion)this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
+    if(!this.reducedMotion&&spell.effect!=='poison')this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
     const radius=spell.radius,depth=2
     const groundY=surfaceAt(this.match.terrain,x)
+    if(spell.effect!=='poison'){
     const flash=this.add.circle(x,groundY,radius*.16,0xffffff,.8).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD)
     this.animateEffect(flash,{radius:radius*1.3,alpha:0,duration:this.reducedMotion?140:250,ease:'Cubic.Out'})
     const ring=this.add.graphics().setPosition(x,groundY).setDepth(depth)
     ring.lineStyle(4,spell.color,.95);ring.strokeCircle(0,0,radius*.32)
     this.animateEffect(ring,{scale:2.2,alpha:0,duration:this.reducedMotion?220:520,ease:'Cubic.Out'})
+    }
     if(spell.effect==='fire'){
       this.terrainFire?.add(this.match.terrain,x,radius)
       const fire=this.add.sprite(x,groundY,'fire-impact').setOrigin(.5,.82).setDisplaySize(radius*2.8,radius*2.8).setDepth(depth)
