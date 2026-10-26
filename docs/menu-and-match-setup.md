@@ -14,7 +14,7 @@ The built-in imagegen tool produced three independent layers from the approved m
 - `assets/menu/scout-hero.webp`: isolate the cyan saucer, mint alien, glass dome, cannon and running lights on transparency; omit scenery and hover rings.
 - `assets/menu/alien-war-title.webp`: isolate the exact ALIEN WAR two-line cyan/amber title, orbital ring and small rock accents on transparency.
 
-The background is an actual image layer; buttons, settings, ship portraits and navigation remain interactive HTML/CSS. CSS animates the hero independently and draws the hover rings and sparse twinkles. Desktop layout matches the approved composition; narrow screens stack setup panels and keep Start Battle reachable. Other ship previews use the game's existing vector ship portraits.
+The background is an actual image layer; buttons, settings, ship portraits and navigation remain interactive HTML/CSS. CSS animates the hero independently and draws the hover rings and sparse twinkles. Desktop layout matches the approved composition; narrow screens stack setup panels and keep Start Battle reachable. All four ship previews and choice cards now use matching illustrated artwork through the shared SHIP_ART mapping. Gameplay still uses its existing procedural ship drawings.
 
 ## Validation
 
@@ -22,3 +22,10 @@ The background is an actual image layer; buttons, settings, ship portraits and n
 - Chromium checks passed main → setup → battle, every ship choice, AI/local setup, saved settings, Back, Options, Exit cancellation, Escape pause, Resume with preserved position/phase, setup-from-pause Back, and returning to main without a Continue button.
 - Visual checks passed at 1440×810, 390×844, 844×390 and 320×568. A 320px overflow found during QA was corrected. Reduced-motion mode disables the hero animation. No browser page errors were observed.
 - Bundling and browser checks used the real new artwork and short recordings/gameplay assets. The existing large intro/menu music and loading PNGs used local stand-ins because those binaries could not be materialized through the connector. Stand-ins are not committed.
+
+
+## Complete selection artwork set
+
+Hopper, Stinger and Orbit were generated with the built-in imagegen tool using Scout as the visual reference. Each is a separate transparent image with consistent navy outlines, glass highlights, mint pilot and running-light treatment. The prompt preserves each silhouette: Hopper is an orange trapezoid with short legs; Stinger is a purple wedge with swept fins; Orbit is green with circular side engine pods. Runtime WebP files preserve alpha and add about 485 KB total. Both the hero preview and card image use the same stable per-ship asset mapping, and all four images participate in opening preload/progress tracking.
+
+Verification includes matching the preview and card URL for every ship, successful image decode, selected-state updates and launching with the selected ship ID. The existing music/loading-artwork test-fixture limitation above still applies; the new ship art is real and committed.
