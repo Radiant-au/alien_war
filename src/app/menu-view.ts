@@ -53,6 +53,12 @@ export function menuMarkup(background:string,hero:string,logo:string,shipArt:rea
   <button id="pause-options" class="menu-button">${icon('gear')}<span>OPTIONS</span></button>
   <button id="back-to-main" class="menu-button"><span>BACK TO MAIN MENU</span></button>
 </div></section>
+<section id="result-view" class="result-page" aria-labelledby="result-title" hidden><div class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+  <p class="result-eyebrow">BATTLE COMPLETE</p><h2 id="result-title">PLAYER 1 WINS!</h2>
+  <div id="result-ship" class="result-ship" aria-hidden="true"></div><p id="result-caption">Nice shot, Commander</p>
+  <button id="play-again" class="menu-button primary"><span aria-hidden="true">↻</span><span>PLAY AGAIN</span></button>
+  <button id="result-main-menu" class="menu-button"><span aria-hidden="true">⌂</span><span>MAIN MENU</span></button>
+</div></section>
 <dialog id="audio-options" aria-labelledby="options-title"><div class="options-heading"><h2 id="options-title">OPTIONS</h2><button id="close-options" aria-label="Close options">×</button></div>
   <label class="sound-setting">SOUND <input id="sound-enabled" type="checkbox" role="switch"><span id="sound-label"></span></label>
   <label class="volume-setting" for="music-volume">MUSIC VOLUME <output id="music-value" for="music-volume"></output></label><input id="music-volume" type="range" min="0" max="100" step="1">

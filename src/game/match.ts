@@ -6,6 +6,8 @@ import { carveCrater, createPlayers, createTerrain, explosionDamage, type Player
 export type Phase = 'InitialCameraTransition' | 'MovementAiming' | 'ProjectileFlight' | 'Impact' | 'Settling' | 'WinnerCheck' | 'CameraTransition' | 'NextPlayerReady' | 'GameOver'
 
 export interface Match {
+  poisons: { player: number; remaining: number; elapsed: number }[]
+  damageTicks: number[]
   terrain: Terrain
   players: Player[]
   active: number
@@ -48,6 +50,7 @@ export function createMatch(seed = 0x51a7, count = 2, variant?: number): Match {
   const terrain = createTerrain(seed, count, variant)
   const players = createPlayers(terrain, count)
   return {
+    poisons: [], damageTicks: [],
     viewWidth: VIEW_WIDTH,
     terrain,
     players,
@@ -72,12 +75,12 @@ export function fire(match: Match): boolean {
   return true
 }
 
-export function resolveShot(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean } = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
+export function resolveShot(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean; effect?: string } = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
   applyShotResult(match,result,blast)
   finishShot(match)
 }
 
-export function applyShotResult(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean }): void {
+export function applyShotResult(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean; effect?: string }): void {
   match.impactX = result.kind === 'impact' ? result.x : undefined
   if (result.kind === 'impact') {
     const radius = blast.radius
@@ -85,6 +88,14 @@ export function applyShotResult(match: Match, result: TerminalResult, blast: { r
     if (blast.destroyTerrain !== false) carveCrater(match.terrain, result.x, result.y, radius)
     for (const player of match.players) {
       const damage = explosionDamage(player, result.x, result.y, radius, blast.damage)
+      if (blast.effect === 'poison') {
+        if (damage > 0 && player.health > 0) {
+          const existing = match.poisons.find(p => p.player === player.id)
+          if (existing) existing.remaining = Math.max(existing.remaining, damage)
+          else match.poisons.push({ player: player.id, remaining: damage, elapsed: 0 })
+        }
+        continue
+      }
       player.health = Math.max(0, player.health - damage)
       if (damage > 0 && player.health > 0) {
         player.grounded = false
@@ -132,6 +143,19 @@ function stepCamera(match: Match, dt: number): void {
 }
 
 export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 = 0): void {
+  match.damageTicks = []
+  if (match.phase === 'GameOver') return
+  for (const poison of match.poisons) {
+    const player = match.players[poison.player]
+    poison.elapsed += dt
+    while (poison.elapsed >= .5 && poison.remaining > 0 && player.health > 0) {
+      poison.elapsed -= .5; poison.remaining--; player.health--
+      match.damageTicks.push(player.id)
+    }
+  }
+  match.poisons = match.poisons.filter(p => p.remaining > 0 && match.players[p.player].health > 0)
+  // Resolve deaths at safe phase boundaries, including a poisoned active player.
+  if (match.phase === 'MovementAiming' && (match.players[match.active].health <= 0 || match.players.filter(p => p.health > 0).length <= 1)) match.phase = 'WinnerCheck'
   switch (match.phase) {
     case 'MovementAiming': {
       const active = match.players[match.active]
