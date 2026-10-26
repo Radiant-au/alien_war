@@ -7,3 +7,7 @@ Surviving ships within the blast radius get a translucent ice coating and snowfl
 This is visual only: damage, fuel, movement, turns and projectile behavior are unchanged. No generated sprites or added asset downloads are required.
 
 Validation: 58 existing tests and production build. Browser checks cover impact/frozen/thaw frames, expiry, restart cleanup, unchanged health/fuel, pause/navigation, and no page errors. Large original music/loading images use local test stand-ins only; those files are not part of this change.
+
+## Large ice-spike sprite
+
+The approved transparent crystal cluster is included as `assets/effects/cryo-spikes.webp` (lossless, transparent padding trimmed, 640×510). Phaser preloads the bundled asset and renders it behind the ships, anchored to the current ground surface. It emerges over 0.3 seconds, holds until 1.8 seconds, then fades out over 1.2 seconds. The ship coating retains its separate 2.5-second timer. Reduced motion displays the spike without growth movement. Sprite instances are capped at eight, destroyed on expiry and cleared on restart/shutdown. Damage remains unchanged.

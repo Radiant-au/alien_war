@@ -5,21 +5,32 @@ export const CRYO_SECONDS=2.5
 export function cryoEnvelope(age:number){
   return {spread:Math.min(1,Math.max(0,age/.24)),alpha:Math.min(1,Math.max(0,age/.12),Math.max(0,(CRYO_SECONDS-age)/.55)),thaw:Math.min(1,Math.max(0,(age-1.95)/.55))}
 }
-interface Frost {x:number;y:number;radius:number;age:number}
-/** Procedural presentation only: no health, movement, terrain or turn mutations. */
+interface Frost {x:number;y:number;radius:number;age:number;spike:Phaser.GameObjects.Image}
+/** Presentation only: no health, movement, terrain or turn mutations. */
 export class CryoEffect {
+  private scene:Phaser.Scene
   private graphics:Phaser.GameObjects.Graphics
   private patches:Frost[]=[]
   private ships=new Map<number,number>()
-  constructor(scene:Phaser.Scene){this.graphics=scene.add.graphics().setDepth(3);scene.events.once(Phaser.Scenes.Events.SHUTDOWN,()=>this.destroy())}
-  clear(){this.patches=[];this.ships.clear();this.graphics.clear()}
+  constructor(scene:Phaser.Scene){this.scene=scene;this.graphics=scene.add.graphics().setDepth(3);scene.events.once(Phaser.Scenes.Events.SHUTDOWN,()=>this.destroy())}
+  clear(){for(const p of this.patches)p.spike.destroy();this.patches=[];this.ships.clear();this.graphics.clear()}
   impact(players:Player[],x:number,y:number,radius:number){
-    this.patches.push({x,y,radius,age:0})
-    if(this.patches.length>8)this.patches.shift()
+    const spike=this.scene.add.image(x,y,'cryo-spikes').setOrigin(.5,1).setDepth(2).setAlpha(0)
+    this.patches.push({x,y,radius,age:0,spike})
+    if(this.patches.length>8)this.patches.shift()!.spike.destroy()
     for(const player of players)if(player.health>0&&explosionDamage(player,x,y,radius,100)>0)this.ships.set(player.id,0)
   }
   update(dt:number,terrain:Terrain,reduced:boolean){
-    this.patches=this.patches.filter(p=>(p.age+=dt)<CRYO_SECONDS)
+    this.patches=this.patches.filter(p=>{
+      p.age+=dt
+      if(p.age>=3){p.spike.destroy();return false}
+      const rise=Math.min(1,p.age/.3),eased=1-(1-rise)**3
+      const width=p.radius*2.3,height=width*p.spike.texture.getSourceImage().height/p.spike.texture.getSourceImage().width
+      p.spike.setPosition(p.x,surfaceAt(terrain,p.x)+2)
+      p.spike.setDisplaySize(width,height*(reduced?1:Math.max(.01,eased)))
+      p.spike.setAlpha(Math.min(1,p.age/.08)*Math.max(0,Math.min(1,(3-p.age)/1.2)))
+      return true
+    })
     for(const [id,age] of this.ships){if(age+dt>=CRYO_SECONDS)this.ships.delete(id);else this.ships.set(id,age+dt)}
     const g=this.graphics;g.clear()
     for(const p of this.patches){
@@ -45,7 +56,7 @@ export class CryoEffect {
         const t=(p.age*.65+i*.137)%1,x=p.x+(i/6-.5)*p.radius*2,y=surfaceAt(terrain,x)-5-t*20
         g.fillStyle(0xb7f4ff,e.alpha*(1-t)*.25);g.fillEllipse(x,y,12+t*12,4+t*3)
       }
-      // Small ice fragments rise and disappear, never giant terrain spikes.
+      // Small ice fragments accompany the large sprite as it emerges.
       if(!reduced&&p.age<.6)for(let i=0;i<5;i++){
         const t=p.age/.6,x=p.x+(i-2)*(7+t*12),y=ground-8-Math.sin(t*Math.PI)*24-i%2*5
         g.fillStyle(0xc6faff,(1-t)*.9);g.fillTriangle(x-2,y,x,y-5,x+3,y+1)
