@@ -103,7 +103,7 @@ test('gravity lands actors on support without consuming movement and supports te
   assert.ok(Math.abs(p.y + PLAYER_HEIGHT / 2 - playerSupport(terrain, p)) < 1e-6)
   assert.equal(p.movementRemaining, allowance)
   p.grounded = true
-  carveCrater(terrain, p.x, p.y, 48)
+  carveCrater(terrain, p.x, p.y, PLAYER_WIDTH * .65)
   assert.equal(stepPlayerGravity(terrain, p, STEP_SECONDS), false)
 })
 

@@ -1,6 +1,6 @@
 import { createShot, createSpreadShots, stepShot, type TerminalResult } from './projectile.ts'
 import { explosionDamage, type Player, type Terrain } from './terrain.ts'
-import { SPELLS } from './spells.ts'
+import { SPELLS, weaponBlast } from './spells.ts'
 import type { Match } from './match.ts'
 
 export type GameMode = 'local' | 'ai'
@@ -70,7 +70,7 @@ export function* searchAiShot(terrain:Terrain,players:Player[],active:number,dif
         if(result)break
         if(step%32===0)yield
       }
-      total+=scoreImpact(result,shooter,players,SPELLS[0].radius,SPELLS[0].damage/3)
+      total+=scoreImpact(result,shooter,players,SPELLS[0].radius,weaponBlast(SPELLS[0]).damage)
     }
     if(total>best.score)best={...best,spell:0,score:total}
   }

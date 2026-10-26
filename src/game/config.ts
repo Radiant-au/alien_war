@@ -2,8 +2,8 @@ export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
 export const WORLD_WIDTH = VIEW_WIDTH * 3.5;
 export const WORLD_HEIGHT = VIEW_HEIGHT;
-export const PLAYER_WIDTH = 84;
-export const PLAYER_HEIGHT = 44;
+export const PLAYER_WIDTH = 100;
+export const PLAYER_HEIGHT = 52;
 export const PLAYER_GAP = 4;
 export const MOVEMENT_SPEED = 240;
 export const MOVEMENT_ALLOWANCE = 120;
@@ -22,3 +22,5 @@ export const GRASS_TUFT_COLOR = 0x4d8f3b;
 export const GRASS_TUFT_DENSITY = 0.18;
 export const GRASS_START_CLEAR_RADIUS = 76;
 export const EXPLOSION_RADIUS = 48;
+
+export const SHIP_RENDER_SCALE = 1.8;
