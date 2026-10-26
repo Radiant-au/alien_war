@@ -1,10 +1,10 @@
 import '../styles/menu.css'
 import '../styles/scenery.css'
-import { SHIPS, shipPortrait } from '../rendering/ships.ts'
+import { SHIPS } from '../rendering/ships.ts'
 import { menuMarkup } from './menu-view.ts'
 import { MenuNavigation } from './menu-state.ts'
 import menuBackgroundUrl from '../../assets/menu/planet-menu.webp'
-import menuHeroUrl from '../../assets/menu/scout-hero.webp'
+import { SHIP_ART } from './menu-assets.ts'
 import menuLogoUrl from '../../assets/menu/alien-war-title.webp'
 import { readPreferences, savePreferences } from './preferences.ts'
 import { withDeadline, remainingLoadingTime } from './startup.ts'
@@ -12,6 +12,7 @@ import { GameAudio, SFX_ASSETS } from './audio.ts'
 import logoUrl from '../../assets/loading/alien-war-logo.png'
 import backgroundUrl from '../../assets/loading/alien-war-background.png'
 
+const menuHeroUrl=SHIP_ART[0]
 const app = document.querySelector<HTMLElement>('#app')!
 const overlay = document.querySelector<HTMLElement>('#loading-screen')!
 const status = document.querySelector<HTMLElement>('#loading-status')!
@@ -28,7 +29,7 @@ const loadingDuration = 15_000
 const menu = document.createElement('section')
 menu.id = 'main-menu-screen'
 menu.setAttribute('aria-label', 'Alien War main menu')
-menu.innerHTML = menuMarkup(menuBackgroundUrl,menuHeroUrl,menuLogoUrl)
+menu.innerHTML = menuMarkup(menuBackgroundUrl,menuHeroUrl,menuLogoUrl,SHIP_ART)
 document.body.append(menu)
 const get = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const options = get<HTMLDialogElement>('#audio-options')
@@ -36,7 +37,7 @@ const exitDialog = get<HTMLDialogElement>('#exit-dialog')
 
 function updateSelection() {
   const ship=SHIPS[settings.ship]
-  get('#hero-ship').innerHTML=settings.ship===0?`<img src="${menuHeroUrl}" alt="">`:shipPortrait(settings.ship)
+  get('#hero-ship').innerHTML=`<img src="${SHIP_ART[settings.ship]}" alt="" width="1672" height="941">`
   get('#selected-ship').textContent=ship.name.toUpperCase()
   for(const [attribute,value] of [['ship',settings.ship],['mode',settings.mode],['count',settings.players],['difficulty',settings.difficulty]] as const){
     menu.querySelectorAll<HTMLButtonElement>(`[data-${attribute}]`).forEach(button=>button.setAttribute('aria-pressed',String(button.getAttribute(`data-${attribute}`)===String(value))))
@@ -196,7 +197,8 @@ async function loadOpening(){
     'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
     'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
-  const total=assets.length+6+SFX_ASSETS.length
+  const menuAssets=[menuBackgroundUrl,menuLogoUrl,...SHIP_ART]
+  const total=assets.length+3+SFX_ASSETS.length+menuAssets.length
   const downloaded=()=>{if(failed)return;completed++;status.textContent=`Downloading assets · ${completed}/${total}`}
   try {
     progress(1,'Downloading assets...')
@@ -209,7 +211,7 @@ async function loadOpening(){
     }
     progressFrame=requestAnimationFrame(animateProgress)
     const artworkTasks=[artwork('#loading-logo',logoUrl),artwork('#loading-background',backgroundUrl)].map(task=>task.then(downloaded))
-    const urls=[...assets.map(path=>`${import.meta.env.BASE_URL}assets/${path}`),...SFX_ASSETS,menuBackgroundUrl,menuHeroUrl,menuLogoUrl]
+    const urls=[...assets.map(path=>`${import.meta.env.BASE_URL}assets/${path}`),...SFX_ASSETS,...menuAssets]
     const downloadTasks=urls.map(async path=>{
       const response=await fetch(path,{cache:'force-cache',signal:AbortSignal.timeout(90000)})
       if(!response.ok)throw new Error(`Asset download failed: ${path} (${response.status})`)

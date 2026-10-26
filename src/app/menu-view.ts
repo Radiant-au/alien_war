@@ -1,4 +1,4 @@
-import { SHIPS, shipPortrait } from '../rendering/ships.ts'
+import { SHIPS } from '../rendering/ships.ts'
 const icon=(name:'play'|'gear'|'exit'|'back'|'people'|'robot'|'arrow'|'resume')=>{
   const paths={
     play:'<path d="M12 6 32 20 12 34Z" fill="currentColor" stroke="none"/>',
@@ -12,7 +12,7 @@ const icon=(name:'play'|'gear'|'exit'|'back'|'people'|'robot'|'arrow'|'resume')=
   }
   return `<svg viewBox="0 0 40 40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`
 }
-export function menuMarkup(background:string,hero:string,logo:string){return `
+export function menuMarkup(background:string,hero:string,logo:string,shipArt:readonly string[]){return `
 <img class="menu-backdrop" src="${background}" alt="" aria-hidden="true" decoding="async">
 <div class="menu-vignette" aria-hidden="true"></div>
 <div class="menu-sparks" aria-hidden="true">${[0,1,2,3,4,5,6,7].map(i=>`<i style="--x:${8+i*12}%;--y:${8+(i*13)%36}%;--delay:${i*.7}s"></i>`).join('')}</div>
@@ -41,7 +41,7 @@ export function menuMarkup(background:string,hero:string,logo:string){return `
     <section class="setup-card setup-ships" aria-label="Choose your ship"><h3>CHOOSE YOUR SHIP</h3>
       <div id="hero-ship" class="setup-hero" aria-hidden="true"></div><div class="setup-hover-ring" aria-hidden="true"></div>
       <h4 id="selected-ship" aria-live="polite"></h4>
-      <div class="ship-choices" role="group" aria-label="Player 1 ship">${SHIPS.map((ship,i)=>`<button class="choice" data-ship="${i}" aria-label="Choose ${ship.name}">${shipPortrait(i)}<span>${ship.name}</span></button>`).join('')}</div>
+      <div class="ship-choices" role="group" aria-label="Player 1 ship">${SHIPS.map((ship,i)=>`<button class="choice" data-ship="${i}" aria-label="Choose ${ship.name}"><img src="${shipArt[i]}" alt="" width="256" height="144"><span>${ship.name}</span></button>`).join('')}</div>
     </section>
   </div>
   <button id="start-battle" class="menu-button primary start-battle"><span>START BATTLE</span>${icon('arrow')}</button>

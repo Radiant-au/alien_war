@@ -19,7 +19,7 @@ test('pause and setup back preserve a match, while returning to main abandons re
   assert.equal(nav.resume(),false)
 })
 test('the main menu has three actions and setup/pause own their respective controls',()=>{
-  const html=menuMarkup('background.webp','hero.webp','title.webp')
+  const html=menuMarkup('background.webp','hero.webp','title.webp',['scout.webp','hopper.webp','stinger.webp','orbit.webp'])
   const main=html.slice(html.indexOf('<section id="main-view"'),html.indexOf('<section id="setup-view"'))
   assert.equal((main.match(/<button /g)||[]).length,3)
   assert.match(main,/id="new-game"/);assert.match(main,/id="open-options"/);assert.match(main,/id="exit-game"/)
@@ -29,6 +29,7 @@ test('the main menu has three actions and setup/pause own their respective contr
   assert.equal((setup.match(/data-count=/g)||[]).length,3)
   assert.equal((setup.match(/data-difficulty=/g)||[]).length,3)
   assert.equal((setup.match(/data-ship=/g)||[]).length,4)
+  for(const name of ['scout','hopper','stinger','orbit'])assert.match(setup,new RegExp(`src="${name}\\.webp"`))
   assert.match(setup,/id="setup-back"/);assert.match(setup,/id="start-battle"/)
   assert.match(html.slice(html.indexOf('<section id="pause-view"')),/id="resume-game"/)
 })
