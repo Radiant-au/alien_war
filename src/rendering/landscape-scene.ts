@@ -5,7 +5,7 @@ import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from '../game/aim.ts'
 import { WORLD_WIDTH, SHIP_RENDER_SCALE } from '../game/config.ts'
 import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, type Match } from '../game/match.ts'
-import { createShot, createSpreadShots, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory, type Shot } from '../game/projectile.ts'
+import { createShot, createWeaponShots, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory, type Shot } from '../game/projectile.ts'
 import { nextTerrainVariant, surfaceAt, type Player } from '../game/terrain.ts'
 import { SPELLS, weaponBlast, type Spell } from '../game/spells.ts'
 import { TerrainFire } from '../terrain-fire.ts'
@@ -74,18 +74,16 @@ export class LandscapeScene extends Phaser.Scene {
   setHud(callback:(hud:BattleHud)=>void){this.hud=callback}
   preload(){
     this.load.image('cryo-spikes',cryoSpikesUrl)
-    this.load.spritesheet('fire-impact','/assets/fire_explosion_32_grid.png',{frameWidth:256,frameHeight:256})
+    this.load.spritesheet('missile-fire','/assets/fire_cluster_spritesheet.svg',{frameWidth:256,frameHeight:128})
     this.load.spritesheet('electric-impact','/assets/electric_weapon_16.png',{frameWidth:256,frameHeight:256})
-    for(const type of ['ice','poison','electric','fire'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
+    this.load.spritesheet('missile-ice','/assets/cryo_shards_spritesheet.svg',{frameWidth:128,frameHeight:64})
+    for(const type of ['poison','electric'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
   }
   create(){
     try { this.createArena(); this.onStartupReady() }
     catch(error) { this.onStartupError(error); console.error('Arena startup failed',error) }
   }
   private createArena(){
-    if(!this.anims.exists('fire-impact-blast'))this.anims.create({key:'fire-impact-blast',frames:this.anims.generateFrameNumbers('fire-impact',{start:0,end:4}),frameRate:15,repeat:0})
-    if(!this.anims.exists('fire-impact-burn'))this.anims.create({key:'fire-impact-burn',frames:this.anims.generateFrameNumbers('fire-impact',{start:5,end:23}),frameRate:8,repeat:2})
-    if(!this.anims.exists('fire-impact-fade'))this.anims.create({key:'fire-impact-fade',frames:this.anims.generateFrameNumbers('fire-impact',{start:24,end:31}),frameRate:7,repeat:0})
     if(!this.anims.exists('electric-impact-animation'))this.anims.create({key:'electric-impact-animation',frames:this.anims.generateFrameNumbers('electric-impact',{start:0,end:15}),frameRate:18,repeat:0})
     for(const type of ['ice','poison','electric','fire']){
       const key=`missile-${type}-travel`
@@ -171,10 +169,10 @@ export class LandscapeScene extends Phaser.Scene {
     window.dispatchEvent(new CustomEvent('alien-war-shot',{detail:{pan:shooter.x/WORLD_WIDTH*2-1}}))
     this.recoil.set(shooter.id,{time:this.elapsed,angle:shooter.aimAngle,power:shooter.power})
     this.shotSpell=SPELLS[this.selectedSpell];this.trail=[];this.clearInputs()
-    this.volleyShots=this.shotSpell.effect==='electric'?createSpreadShots(shooter):[this.match.shot!]
+    this.volleyShots=createWeaponShots(shooter,this.shotSpell)
     this.match.shot=this.volleyShots[Math.floor(this.volleyShots.length/2)]
     const texture=MISSILE_TEXTURES[this.shotSpell.effect]
-    this.volleyMissiles=this.volleyShots.map(shot=>this.add.sprite(shot.x,shot.y,texture).setDisplaySize(84,42).setDepth(5).play(`missile-${this.shotSpell.effect}-travel`))
+    this.volleyMissiles=this.volleyShots.map(shot=>this.add.sprite(shot.x,shot.y,texture).setDisplaySize(this.shotSpell.effect==='ice'?38: this.shotSpell.effect==='fire'?72:84,this.shotSpell.effect==='ice'?19:this.shotSpell.effect==='fire'?36:42).setDepth(5).play(`missile-${this.shotSpell.effect}-travel`))
     this.syncMissile()
   }
   restart(count=this.match.players.length){
@@ -396,7 +394,7 @@ export class LandscapeScene extends Phaser.Scene {
       const missile=this.volleyMissiles[i]
       if(!missile)return
       missile.setPosition(shot.x,shot.y).setRotation(Math.atan2(shot.vy,shot.vx))
-      if(this.shotSpell.effect==='fire')missile.setDisplaySize(112/this.cameras.main.zoom,56/this.cameras.main.zoom)
+      if(this.shotSpell.effect==='fire')missile.setDisplaySize(72/this.cameras.main.zoom,36/this.cameras.main.zoom)
     })
   }
   private clearMissile(){for(const missile of this.volleyMissiles)missile.destroy();this.volleyMissiles=[];this.volleyShots=[]}
@@ -420,11 +418,15 @@ export class LandscapeScene extends Phaser.Scene {
     }
     if(spell.effect==='fire'){
       this.terrainFire?.add(this.match.terrain,x,radius)
-      const fire=this.add.sprite(x,groundY,'fire-impact').setOrigin(.5,.82).setDisplaySize(radius*2.8,radius*2.8).setDepth(depth)
-      this.anchorToTerrain(fire,x,0)
-      this.trackEffect(fire)
-      fire.once('animationcomplete-fire-impact-fade',()=>this.removeEffect(fire))
-      fire.play({key:'fire-impact-blast',frameRate:this.reducedMotion?24:15});fire.chain(['fire-impact-burn','fire-impact-fade'])
+      // Procedural tongues and embers replace the old blast sprite entirely.
+      for(let i=0;i<5;i++){
+        const tongue=this.add.graphics().setPosition(x+(i-2)*radius*.17,groundY).setDepth(depth)
+        const height=radius*(.35+(i%2)*.16)
+        tongue.fillStyle(0xff7436,.85);tongue.beginPath();tongue.moveTo(-9,0);tongue.lineTo(-10,-height*.35);tongue.lineTo(-2,-height*.6);tongue.lineTo(0,-height);tongue.lineTo(11,-height*.45);tongue.lineTo(9,0);tongue.closePath();tongue.fillPath()
+        tongue.fillStyle(0xffe4a0,.95);tongue.fillTriangle(-4,0,2,-height*.65,5,0)
+        this.anchorToTerrain(tongue,tongue.x,0)
+        this.animateEffect(tongue,{scaleY:1.4,alpha:0,duration:this.reducedMotion?200:600+i*40,ease:'Sine.Out'})
+      }
       if(!this.reducedMotion)for(let i=0;i<5;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0xff8a2b,radius)
     }else if(spell.effect==='electric'){
       window.dispatchEvent(new Event('alien-war-electric-impact'))

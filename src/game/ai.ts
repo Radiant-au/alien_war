@@ -1,4 +1,4 @@
-import { createShot, createSpreadShots, stepShot, type TerminalResult } from './projectile.ts'
+import { createWeaponShots, stepShot, type TerminalResult } from './projectile.ts'
 import { explosionDamage, type Player, type Terrain } from './terrain.ts'
 import { SPELLS, weaponBlast } from './spells.ts'
 import type { Match } from './match.ts'
@@ -34,17 +34,18 @@ export function* searchAiShot(terrain:Terrain,players:Player[],active:number,dif
   let best:AiPlan={angle:shooter.aimAngle,power:.65,spell:2,score:-Infinity}
   function* trial(angle:number,power:number):Generator<void,void,void>{
     const candidate={...shooter,aimAngle:angle,power}
-    const shot=createShot(candidate)
-    let result:TerminalResult|undefined
-    for(let step=0;step<720;step++){
-      result=stepShot(shot,terrain,players,1/60)
-      if(result)break
-      if(step%32===0)yield
-    }
     for(let spell=0;spell<SPELLS.length;spell++){
-      // Electric spreads three shots with one third damage per impact.
-      if(SPELLS[spell].effect==='electric')continue
-      const s=SPELLS[spell],score=scoreImpact(result,shooter,players,s.radius,s.damage)
+      const s=SPELLS[spell],shots=createWeaponShots(candidate,s)
+      let score=0
+      for(const shot of shots){
+        let result:TerminalResult|undefined
+        for(let step=0;step<720;step++){
+          result=stepShot(shot,terrain,players,1/60)
+          if(result)break
+          if(step%32===0)yield
+        }
+        score+=scoreImpact(result,shooter,players,s.radius,weaponBlast(s).damage)
+      }
       if(score>best.score)best={angle,power,spell,score}
     }
     yield
@@ -60,19 +61,7 @@ export function* searchAiShot(terrain:Terrain,players:Player[],active:number,dif
       if(Math.sin(angle)>=0)continue
       yield* trial(angle,Math.max(.15,Math.min(1,coarse.power+p*.009)))
     }
-    // Evaluate the electric volley explicitly, rather than assuming a single central hit.
-    const shots=createSpreadShots({...shooter,aimAngle:best.angle,power:best.power})
-    let total=0
-    for(const shot of shots){
-      let result:TerminalResult|undefined
-      for(let step=0;step<720;step++){
-        result=stepShot(shot,terrain,players,1/60)
-        if(result)break
-        if(step%32===0)yield
-      }
-      total+=scoreImpact(result,shooter,players,SPELLS[0].radius,weaponBlast(SPELLS[0]).damage)
-    }
-    if(total>best.score)best={...best,spell:0,score:total}
+
   }
   return best
 }

@@ -209,9 +209,9 @@ async function loadOpening(){
   let assetsReady=false
   let progressFrame=0
   const assets=[
-    'fire_explosion_32_grid.png','electric_weapon_16.png',
-    'ice_missile_spritesheet.svg','poison_missile_spritesheet.svg',
-    'electric_missile_spritesheet.svg','fire_missile_spritesheet.svg',
+    'fire_cluster_spritesheet.svg','electric_weapon_16.png',
+    'cryo_shards_spritesheet.svg','poison_missile_spritesheet.svg',
+    'electric_missile_spritesheet.svg',
     'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
   const menuAssets=[menuBackgroundUrl,menuLogoUrl,...SHIP_ART]

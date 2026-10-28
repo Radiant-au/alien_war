@@ -75,17 +75,17 @@ export function fire(match: Match): boolean {
   return true
 }
 
-export function resolveShot(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean; effect?: string } = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
+export function resolveShot(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean; effect?: string; terrainRadius?: number } = { radius: EXPLOSION_RADIUS, damage: 60 }): void {
   applyShotResult(match,result,blast)
   finishShot(match)
 }
 
-export function applyShotResult(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean; effect?: string }): void {
+export function applyShotResult(match: Match, result: TerminalResult, blast: { radius: number; damage: number; destroyTerrain?: boolean; effect?: string; terrainRadius?: number }): void {
   match.impactX = result.kind === 'impact' ? result.x : undefined
   if (result.kind === 'impact') {
     const radius = blast.radius
     match.explosion = { x: result.x, y: result.y, time: 0.2 }
-    if (blast.destroyTerrain !== false) carveCrater(match.terrain, result.x, result.y, radius)
+    if (blast.destroyTerrain !== false) carveCrater(match.terrain, result.x, result.y, blast.terrainRadius ?? radius)
     for (const player of match.players) {
       const damage = explosionDamage(player, result.x, result.y, radius, blast.damage)
       if (blast.effect === 'poison') {

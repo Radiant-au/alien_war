@@ -25,7 +25,7 @@ export class CryoEffect {
       p.age+=dt
       if(p.age>=3){p.spike.destroy();return false}
       const rise=Math.min(1,p.age/.3),eased=1-(1-rise)**3
-      const width=p.radius*2.3,height=width*p.spike.texture.getSourceImage().height/p.spike.texture.getSourceImage().width
+      const width=p.radius*1.8,height=width*p.spike.texture.getSourceImage().height/p.spike.texture.getSourceImage().width
       p.spike.setPosition(p.x,surfaceAt(terrain,p.x)+2)
       p.spike.setDisplaySize(width,height*(reduced?1:Math.max(.01,eased)))
       p.spike.setAlpha(Math.min(1,p.age/.08)*Math.max(0,Math.min(1,(3-p.age)/1.2)))

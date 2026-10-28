@@ -1,10 +1,10 @@
 export const SPELLS = [
-  { name: 'Plasma Bolt', color: 0x39daff, radius: 56, damage: 48, effect: 'electric', destroyTerrain: true },
-  { name: 'Acid Bomb', color: 0x75ef39, radius: 82, damage: 20, effect: 'poison', destroyTerrain: false },
-  { name: 'Gravity Orb', color: 0xb45cf5, radius: 70, damage: 56, effect: 'fire', destroyTerrain: true },
-  { name: 'Cryo Spike', color: 0x80efff, radius: 48, damage: 60, effect: 'ice', destroyTerrain: true },
+  { name: 'Plasma Bolt', color: 0x39daff, radius: 64, terrainRadius: 56, damage: 45, effect: 'electric', destroyTerrain: true },
+  { name: 'Acid Bomb', color: 0x75ef39, radius: 90, terrainRadius: 0, damage: 18, effect: 'poison', destroyTerrain: false },
+  { name: 'Flame Volley', color: 0xff913d, radius: 80, terrainRadius: 56, damage: 51, effect: 'fire', destroyTerrain: true },
+  { name: 'Cryo Shards', color: 0x80efff, radius: 58, terrainRadius: 44, damage: 55, effect: 'ice', destroyTerrain: true },
 ] as const
 export type Spell = typeof SPELLS[number]
-
-/** Damage is a whole-shot budget; the electric volley divides it across 3 pellets. */
-export function weaponBlast(spell:Spell){return {...spell,damage:spell.damage/(spell.effect==='electric'?3:1)}}
+export function projectileCount(spell:Spell){return spell.effect==='ice'?5:spell.effect==='electric'||spell.effect==='fire'?3:1}
+/** A full volley shares one budget; terrain and health radii are independent. */
+export function weaponBlast(spell:Spell){return {...spell,damage:spell.damage/projectileCount(spell)}}

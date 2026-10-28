@@ -1,19 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { SPELLS, weaponBlast } from '../src/game/spells.ts'
+import { SPELLS, weaponBlast, projectileCount } from '../src/game/spells.ts'
 import { createMatch, applyShotResult } from '../src/game/match.ts'
 import { explosionDamage } from '../src/game/terrain.ts'
 import { PLAYER_WIDTH, PLAYER_HEIGHT, SHIP_RENDER_SCALE } from '../src/game/config.ts'
 import { createShot, sweepShot } from '../src/game/projectile.ts'
 
-test('a complete weapon shot removes at most 48–60 direct health with acid reserved for gradual damage',()=>{
-  const budgets=[48,0,56,60]
+test('a complete weapon shot removes at most 45–55 direct health with acid reserved for gradual damage',()=>{
+  const budgets=[45,0,51,55]
   for(let i=0;i<SPELLS.length;i++){
     const match=createMatch(),target=match.players[1],spell=SPELLS[i],blast=weaponBlast(spell)
-    const pellets=spell.effect==='electric'?3:1
+    const pellets=projectileCount(spell)
     for(let p=0;p<pellets;p++)applyShotResult(match,{kind:'impact',x:target.x,y:target.y,target:target.id},blast)
     assert.equal(100-target.health,budgets[i])
-    if(i===1)assert.equal(match.poisons[0].remaining,20)
+    if(i===1)assert.equal(match.poisons[0].remaining,18)
   }
 })
 test('splash falls off continuously outside the enlarged collision body',()=>{
