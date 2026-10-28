@@ -91,6 +91,12 @@ scene.setHud(({match,spell,aimFeedback})=>{
   aimWheel.style.setProperty('--wheel-y',`${Math.sin(player.aimAngle)*player.power*knobRange}px`)
   aimWheel.style.setProperty('--wheel-angle',`${player.aimAngle*180/Math.PI}deg`)
   const readout=document.querySelector<HTMLElement>('#ship-aim-info')!
+  const wheelRect=aimWheel.getBoundingClientRect(),shipX=aimFeedback.x,shipY=aimFeedback.y
+  if(shipX>wheelRect.left-42&&shipX<wheelRect.right+42&&shipY>wheelRect.top-32&&shipY<wheelRect.bottom+32){
+    const commandTop=document.querySelector('.command-bar')!.getBoundingClientRect().top
+    aimWheel.style.top=`${Math.max(8,Math.min(commandTop-wheelRect.height-12,shipY-wheelRect.height-24))}px`
+    aimWheel.style.bottom='auto'
+  }else{aimWheel.style.top='';aimWheel.style.bottom=''}
   readout.style.opacity=String(aimFeedback.alpha)
   readout.setAttribute('aria-hidden',String(aimFeedback.alpha===0))
   // Keep the two small panels on screen even when a ship is near a world edge.

@@ -1,6 +1,6 @@
 import type { Preferences } from './preferences.ts'
-export type SampleKind='shot'|'electric'|'poison'
-export interface AudioTracks { intro:string; menu:string; shot:string; electric:string; poison:string }
+export type SampleKind='shot'|'electric'|'poison'|'fire'|'ice'
+export interface AudioTracks { intro:string; menu:string; shot:string; electric:string; poison:string; fire:string; ice:string }
 export function volumeGain(percent:number){return Math.max(0,Math.min(100,percent))/100}
 
 /** Shared buses let recorded sounds and synthesized cues obey the same mixer. */
@@ -18,7 +18,7 @@ export class AudioMixer {
   private settings:Preferences
   private urls:AudioTracks
   private pools:Record<SampleKind,HTMLAudioElement[]>
-  private poolIndex={shot:0,electric:0,poison:0}
+  private poolIndex:Record<SampleKind,number>={shot:0,electric:0,poison:0,fire:0,ice:0}
   private routes=new Map<HTMLAudioElement,StereoPannerNode>()
   private buffers=new Map<SampleKind,AudioBuffer>()
   private voices=new Set<AudioScheduledSourceNode>()
@@ -29,8 +29,8 @@ export class AudioMixer {
     this.settings={...settings};this.urls=urls;this.track=urls.intro
     this.decks=[new Audio(urls.intro),new Audio(urls.menu)]
     for(const deck of this.decks){deck.loop=true;deck.preload='auto'}
-    this.pools={shot:[],electric:[],poison:[]}
-    for(const kind of ['shot','electric','poison'] as const){
+    this.pools={shot:[],electric:[],poison:[],fire:[],ice:[]}
+    for(const kind of ['shot','electric','poison','fire','ice'] as const){
       this.pools[kind]=Array.from({length:kind==='shot'?4:2},()=>{const a=new Audio(urls[kind]);a.preload='auto';return a})
     }
     document.addEventListener('visibilitychange',this.visibility)
@@ -67,7 +67,7 @@ export class AudioMixer {
   private async loadSamples(){
     if(this.loading||!this.context)return
     this.loading=true
-    await Promise.all((['shot','electric','poison'] as const).map(async kind=>{
+    await Promise.all((['shot','electric','poison','fire','ice'] as const).map(async kind=>{
       try{
         const response=await fetch(this.urls[kind],{signal:AbortSignal.timeout(15000)})
         if(!response.ok)return
@@ -155,11 +155,7 @@ export class AudioMixer {
     if(this.scene!=='battle'||!this.audible()||this.settings.sfx<=0)return
     if(effect==='electric')this.playSample('electric',pan)
     else if(effect==='poison')this.playSample('poison',pan)
-    else if(effect==='fire'){
-      this.tone(130,28,.5,.4,0,pan,'triangle');this.tone(310,55,.23,.12,.025,pan,'sawtooth')
-    }else{
-      this.tone(1600,500,.24,.12,0,pan);this.tone(2200,900,.3,.08,.045,pan)
-    }
+    else if(effect==='fire'||effect==='ice')this.playSample(effect,pan)
   }
   turn(){if(this.scene==='battle'){this.tone(440,520,.1,.1);this.tone(660,740,.14,.1,.12)}}
   victory(){if(this.scene==='battle')for(const [i,note]of [523,659,784,1046].entries())this.tone(note,note,.28,.15,i*.14)}
