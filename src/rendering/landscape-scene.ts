@@ -1,3 +1,4 @@
+import { CombatPolish } from './combat-polish.ts'
 import cryoSpikesUrl from '../../assets/effects/cryo-spikes.webp'
 import { CryoEffect } from './cryo.ts'
 import { AiController, computerTurn, type GameMode, type Difficulty } from '../game/ai.ts'
@@ -49,9 +50,10 @@ export class LandscapeScene extends Phaser.Scene {
   private held=new Map<number,-1|1>()
   private crystalGlows:Phaser.GameObjects.Image[]=[]
   private crystals:Crystal[]=[]
-  private burningUntil=new Map<number,number>()
   private terrainFire?:TerrainFire
   private cryo?:CryoEffect
+  private polish?:CombatPolish
+  private resultDelay=0
   private particles:Phaser.GameObjects.GameObject[]=[]
   private volleyShots:Shot[]=[]
   private volleyMissiles:Phaser.GameObjects.Sprite[]=[]
@@ -98,6 +100,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.add.image(0,0,'battle-terrain').setOrigin(0).setDepth(0)
     this.terrainFire=new TerrainFire(this,this.reducedMotion)
     this.actors=this.add.graphics().setDepth(3)
+    this.polish=new CombatPolish(this);this.polish.clear(this.match.players)
     window.addEventListener('keydown',this.keyDown);window.addEventListener('keyup',this.keyUp)
     this.cameras.main.setOrigin(0,0)
     this.generateCrystals();this.drawTerrain();this.resizeView()
@@ -174,13 +177,16 @@ export class LandscapeScene extends Phaser.Scene {
     const texture=MISSILE_TEXTURES[this.shotSpell.effect]
     this.volleyMissiles=this.volleyShots.map(shot=>this.add.sprite(shot.x,shot.y,texture).setDisplaySize(this.shotSpell.effect==='ice'?38: this.shotSpell.effect==='fire'?72:84,this.shotSpell.effect==='ice'?19:this.shotSpell.effect==='fire'?36:42).setDepth(5).play(`missile-${this.shotSpell.effect}-travel`))
     this.syncMissile()
+    const muzzlePose=shipPose(this.match.terrain,shooter,this.elapsed,this.reducedMotion)
+    this.polish?.muzzle(shooter.x+Math.cos(shooter.aimAngle)*43.5,muzzlePose.y+4+Math.sin(shooter.aimAngle)*43.5,shooter.aimAngle,this.shotSpell.effect)
   }
   restart(count=this.match.players.length){
-    this.ai.reset();this.audioTurn=-1;this.audioOutcome=false
+    this.ai.reset();this.audioTurn=-1;this.audioOutcome=false;this.resultDelay=0
     this.terrainFire?.clear();this.cryo?.clear()
     const variant=nextTerrainVariant(this.terrainVariants.get(count))
     this.terrainVariants.set(count,variant)
-    this.clearInputs();this.clearMissile();this.burningUntil.clear();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count,variant);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
+    this.clearInputs();this.clearMissile();this.recoil.clear();this.match=createMatch(Math.floor(Math.random()*0xffffffff),count,variant);this.revision=-1;this.stepAccumulator=0;this.trail=[];this.moving=[];this.tilts=[]
+    this.polish?.clear(this.match.players)
     this.previousX=this.match.players.map(p=>p.x);for(const p of this.particles){this.tweens.killTweensOf(p);p.destroy()}this.particles=[];this.terrainAnchors.clear();this.terrainPatches=[]
     if(this.actors){this.generateCrystals();this.drawTerrain();this.resizeView()}
   }
@@ -300,7 +306,9 @@ export class LandscapeScene extends Phaser.Scene {
           if(!result)continue
           if(result.kind==='impact'){
             const blast=weaponBlast(this.shotSpell)
-            applyShotResult(this.match,result,blast);this.impact(result.x,this.shotSpell,result.target)
+            applyShotResult(this.match,result,blast);this.polish?.observe(this.match.players,this.shotSpell.effect)
+            if(blast.destroyTerrain)this.polish?.debris(result.x,result.y)
+            this.impact(result.x,this.shotSpell,result.target)
           }
           this.volleyShots.splice(i,1);this.volleyMissiles.splice(i,1)[0]?.destroy()
         }
@@ -308,7 +316,8 @@ export class LandscapeScene extends Phaser.Scene {
         else {finishShot(this.match);this.trail=[];this.clearMissile()}
       }
       updateMatch(this.match,STEP_SECONDS,axis)
-      for(const id of this.match.damageTicks)this.poisonTick(id)
+      for(const id of this.match.damageTicks){this.poisonTick(id);this.polish?.poison(id)}
+      this.polish?.observe(this.match.players,this.match.damageTicks.length?'poison':this.shotSpell.effect)
       this.stepAccumulator-=STEP_SECONDS
     }
     if(beforePhase!==this.match.phase)this.clearInputs()
@@ -316,6 +325,7 @@ export class LandscapeScene extends Phaser.Scene {
     if(this.revision!==this.match.terrain.revision){this.drawTerrain();this.refreshTerrainEffects()}
     if(this.match.shot&&this.shotSpell.effect!=='fire'){this.trail.push({x:this.match.shot.x,y:this.match.shot.y});if(this.trail.length>18)this.trail.shift()}
     this.syncMissile()
+    this.polish?.update(Math.min(delta,100)/1000,this.match.terrain,this.reducedMotion)
     this.cryo?.update(Math.min(delta,100)/1000,this.match.terrain,this.reducedMotion)
     this.terrainFire?.update(Math.min(delta,100)/1000,this.match.terrain)
     if(this.match.phase==='MovementAiming'){
@@ -324,7 +334,8 @@ export class LandscapeScene extends Phaser.Scene {
       this.baseScrollY=300-this.cameras.main.height*.72/this.cameras.main.zoom
     }
     if(this.match.phase==='MovementAiming'&&this.audioTurn!==this.match.active){this.audioTurn=this.match.active;window.dispatchEvent(new Event('alien-war-turn'))}
-    if(this.match.phase==='GameOver'&&!this.audioOutcome){this.audioOutcome=true;window.dispatchEvent(new CustomEvent('alien-war-victory',{detail:{outcome:this.match.outcome,winner:this.match.players.find(p=>p.health>0)?.id,shipKinds:[...this.shipKinds],mode:this.mode}}))}
+    if(this.match.phase==='GameOver')this.resultDelay+=Math.min(delta,100)/1000
+    if(this.match.phase==='GameOver'&&this.resultDelay>=.55&&!this.audioOutcome){this.audioOutcome=true;window.dispatchEvent(new CustomEvent('alien-war-victory',{detail:{outcome:this.match.outcome,winner:this.match.players.find(p=>p.health>0)?.id,shipKinds:[...this.shipKinds],mode:this.mode}}))}
     this.positionCamera();this.drawActors(Math.min(delta,100)/1000);this.hud({match:this.match,spell:this.selectedSpell,aimFeedback:this.aimFeedback()})
   }
   private aimFeedback(){
@@ -357,14 +368,7 @@ export class LandscapeScene extends Phaser.Scene {
     if(fired&&this.elapsed-fired.time>=.65)this.recoil.delete(player.id)
     g.save();g.translateCanvas(pose.x+recoil.x,pose.y+recoil.y);g.rotateCanvas(tilt+recoil.angle);g.scaleCanvas(dir*SHIP_RENDER_SCALE,SHIP_RENDER_SCALE)
     const thrust=this.moving[kind]&&!this.reducedMotion?.5+Math.sin(this.elapsed*18)*.25:0
-    drawShip(g,kind,thrust);this.cryo?.drawShip(g,player.id,this.reducedMotion);g.restore()
-    if((this.burningUntil.get(kind)??0)>this.elapsed){
-      const flicker=this.reducedMotion?0:Math.sin(this.elapsed*19+kind*3),top=pose.y-24+flicker*2
-      g.fillStyle(0xff6029,.85);g.fillTriangle(pose.x-20,top+21,pose.x-10,top-4-Math.abs(flicker)*3,pose.x-3,top+22)
-      g.fillTriangle(pose.x+3,top+22,pose.x+11,top-2+flicker*2,pose.x+20,top+21)
-      g.fillStyle(0xffce54,.95);g.fillTriangle(pose.x-15,top+19,pose.x-10,top+5,pose.x-6,top+20)
-      g.fillTriangle(pose.x+7,top+20,pose.x+12,top+4-flicker*2,pose.x+16,top+19)
-    }
+    drawShip(g,kind,thrust);this.polish?.drawShip(g,player.id,this.match.poisons.some(p=>p.player===player.id),this.elapsed,this.reducedMotion);this.cryo?.drawShip(g,player.id,this.reducedMotion);g.restore()
     // The weapon keeps the world-space aim angle while the hull follows the slope.
     g.save();g.translateCanvas(player.x+recoil.x,pose.y+4+recoil.y);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.5,1.5)
     g.fillStyle(0x172941);g.fillRoundedRect(5,-4,24,8,3)
@@ -405,7 +409,6 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private impact(x:number,spell:Spell,target:'terrain'|number){
     window.dispatchEvent(new CustomEvent('alien-war-impact',{detail:{effect:spell.effect,pan:x/WORLD_WIDTH*2-1}}))
-    if(spell.effect==='fire'&&target!=='terrain'&&this.match.players[target]?.health>0)this.burningUntil.set(target,this.elapsed+2.4)
     if(!this.reducedMotion&&spell.effect!=='poison'&&spell.effect!=='ice')this.cameras.main.shake(150,spell.effect==='electric'?.006:.004)
     const radius=spell.radius,depth=2
     const groundY=surfaceAt(this.match.terrain,x)
@@ -438,12 +441,8 @@ export class LandscapeScene extends Phaser.Scene {
       if(!this.reducedMotion)for(let i=0;i<7;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0x6ffaff,radius*.8)
     }else if(spell.effect==='poison'){
       window.dispatchEvent(new Event('alien-war-poison-impact'))
-      const puddle=this.surfacePatch(x,groundY,radius*1.3,0x1d3a12,.96,0x39ff14,1,4,20,true).setDepth(depth)
-      this.animateEffect(puddle,{alpha:0,scale:.94,duration:this.reducedMotion?500:4800,delay:this.reducedMotion?0:2500})
-      if(!this.reducedMotion)for(let i=0;i<20;i++){
-        const bubbleX=x+(Math.random()-.5)*radius*2
-        this.risingParticle(bubbleX,surfaceAt(this.match.terrain,bubbleX),0x39ff14,radius,Math.floor(i/2)*260,4+Math.random()*3)
-      }
+      const duration=Math.max(.5,...this.match.poisons.map(p=>p.remaining*.5))
+      this.polish?.acid(x,radius,duration)
     }else{
       this.cryo??=new CryoEffect(this)
       const hitY=target==='terrain'?groundY:this.match.players[target].y

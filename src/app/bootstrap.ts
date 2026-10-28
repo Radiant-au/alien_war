@@ -52,6 +52,7 @@ function updateSelection() {
   savePreferences(settings)
 }
 function updateAudio() {
+  get<HTMLInputElement>('#music-boost').checked=settings.musicBoost
   get<HTMLInputElement>('#sound-enabled').checked = settings.sound
   get('#sound-label').textContent = settings.sound ? 'ON' : 'OFF'
   for(const key of ['music','sfx'] as const) {
@@ -159,6 +160,7 @@ menu.querySelectorAll<HTMLButtonElement>('[data-difficulty]').forEach(button=>bu
 document.addEventListener('click',event=>{
   if(event.target instanceof Element&&event.target.closest('#main-menu'))showPause()
 })
+get('#music-boost').addEventListener('change',event=>{settings.musicBoost=(event.target as HTMLInputElement).checked;audio.unlock();updateAudio()})
 get('#sound-enabled').addEventListener('change',event=>{settings.sound=(event.target as HTMLInputElement).checked;audio.unlock();updateAudio();audio.click()})
 for(const key of ['music','sfx'] as const)get(`#${key}-volume`).addEventListener('input',event=>{settings[key]=Number((event.target as HTMLInputElement).value);audio.unlock();updateAudio();if(key==='sfx')audio.click()})
 window.addEventListener('alien-war-shot',event=>audio.shot((event as CustomEvent).detail?.pan??0))
