@@ -61,6 +61,7 @@ export function menuMarkup(background:string,hero:string,logo:string,shipArt:rea
 </div></section>
 <dialog id="audio-options" aria-labelledby="options-title"><div class="options-heading"><h2 id="options-title">OPTIONS</h2><button id="close-options" aria-label="Close options">×</button></div>
   <label class="sound-setting">SOUND <input id="sound-enabled" type="checkbox" role="switch"><span id="sound-label"></span></label>
+  <label class="sound-setting">MUSIC BOOST <input id="music-boost" type="checkbox" role="switch"><span>LOUDER</span></label>
   <label class="volume-setting" for="music-volume">MUSIC VOLUME <output id="music-value" for="music-volume"></output></label><input id="music-volume" type="range" min="0" max="100" step="1">
   <label class="volume-setting" for="sfx-volume">SFX VOLUME <output id="sfx-value" for="sfx-volume"></output></label><input id="sfx-volume" type="range" min="0" max="100" step="1">
 </dialog>

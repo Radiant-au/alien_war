@@ -58,3 +58,15 @@
 @keyframes aurora-drift{to{transform:translate(100px,-18px) scale(1.12);opacity:.7}}
 @media (prefers-reduced-motion:reduce){.scenery-stars,.scenery-stars circle,.scenery-mist,.scenery-aurora{animation:none}}
 .spell-icon img{width:100%;height:100%;object-fit:cover;border-radius:6px}
+/* Compact picture buttons; retain the original JPEG assets. */
+.command-bar{grid-template-columns:minmax(0,1fr) auto;padding-left:108px;min-height:78px;gap:16px;background:linear-gradient(180deg,#101c3af5,#09132cfb);border-top:1px solid #357d98}
+.command-bar .spell-controls{grid-column:1;justify-self:center;gap:8px;min-width:0}
+.command-bar .spell{display:flex;flex-direction:row;align-items:center;gap:7px;padding:5px 10px 5px 5px;border:1px solid #3d5882;border-radius:10px;background:#0b1832;min-height:46px;font-size:10px;font-weight:700;transition:border-color .15s,background .15s,box-shadow .15s}
+.command-bar .spell-icon{width:32px;height:32px;flex-shrink:0;border:0;box-shadow:none}.command-bar .spell-icon img{border-radius:7px}
+.command-bar .spell.selected{border-color:#46e8f6;background:#123256;box-shadow:0 0 0 1px #46e8f655,0 0 9px #28d7ee22}.command-bar .spell:hover:not(:disabled){background:#162b49}.command-bar .spell:active:not(:disabled){transform:translateY(1px)}
+.command-bar #fire{grid-column:2;width:112px;height:42px;font-size:20px}
+/* Dock the user's wheel in its own toolbar lane, below the battlefield. */
+.field-controls{z-index:8}.field-controls #aim-wheel{left:max(18px,env(safe-area-inset-left));bottom:max(9px,env(safe-area-inset-bottom));gap:0}.field-controls .wheel-disc{width:60px;height:60px}.field-controls .wheel-knob{width:18px;height:18px}.field-controls .wheel-caption{display:none}
+@media(max-width:700px){.command-bar{padding-left:84px;padding-right:10px;gap:8px}.command-bar .spell-controls{gap:5px}.command-bar .spell{font-size:9px;padding:4px;gap:4px}.command-bar .spell-icon{width:28px;height:28px}.command-bar #fire{width:72px;font-size:17px}.field-controls #aim-wheel{left:12px}}
+@media(max-width:480px){.command-bar{min-height:92px;padding-left:78px;gap:6px}.command-bar .spell-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;width:100%;max-width:210px}.command-bar .spell{min-height:34px;font-size:8px;padding:3px;gap:4px}.command-bar .spell-icon{width:24px;height:24px}.command-bar #fire{width:56px;font-size:14px}.command-bar #fire svg{width:17px;height:17px}.field-controls #aim-wheel{bottom:18px}.field-controls .wheel-disc{width:54px;height:54px}.field-controls .movement-controls{bottom:calc(var(--command-height,92px) + 12px)}}
+@media(prefers-reduced-motion:reduce){.command-bar .spell{transition:none}.command-bar .spell:active:not(:disabled){transform:none}}

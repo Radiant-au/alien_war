@@ -49,15 +49,20 @@ test('mixer routes recordings and synth cues, mutes, pauses and disposes cleanly
     const gains=nodes.filter(n=>n.kind==='gain')
     assert.equal(gains[0].gain.value,1) // master
     assert.equal(gains[1].gain.value,1) // effects
-    assert.equal(gains[2].gain.value,1) // music
+    assert.equal(gains[2].gain.value,1.6) // boosted music
     assert.equal(gains[2].to,gains[0]) // music bypasses the effects limiter
+    mixer.update({...defaults,music:100,sfx:100,musicBoost:false})
+    assert.equal(gains[2].gain.value,1) // original level with boost disabled
+    mixer.update({...defaults,music:100,sfx:100,musicBoost:true})
     mixer.shot(1)
-    assert.equal(gains[2].gain.value,1) // no automatic music ducking
+    assert.equal(gains[2].gain.value,1.6) // no automatic music ducking
     assert.equal(nodes.find(n=>n.kind==='buffer').to.pan.value,0) // retain recorded stereo balance
-    assert.equal(nodes.filter(n=>n.kind==='media').length,10)
+    assert.equal(nodes.filter(n=>n.kind==='media').length,14)
     assert.ok(nodes.some(n=>n.kind==='buffer'&&n.started))
     assert.ok(nodes.some(n=>n.kind==='oscillator'&&n.started))
+    mixer.tone(440,520,.1,.1,0,.7) // synthesized cues may still be positioned
     assert.ok(nodes.some(n=>n.kind==='panner'&&n.pan.value>0))
+    mixer.tone(440,520,.1,.1,0,-.7)
     assert.ok(nodes.some(n=>n.kind==='panner'&&n.pan.value<0))
     mixer.update({...defaults,sound:false})
     assert.ok(media.every(a=>!a.playing))

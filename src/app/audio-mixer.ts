@@ -105,7 +105,7 @@ export class AudioMixer {
   private sync(){
     const audible=this.audible()
     this.ramp(this.effects,audible?volumeGain(this.settings.sfx):0)
-    this.ramp(this.musicBus,audible?volumeGain(this.settings.music):0)
+    this.ramp(this.musicBus,audible?volumeGain(this.settings.music)*(this.settings.musicBoost?1.6:1):0)
     for(const pool of Object.values(this.pools))for(const sample of pool)sample.volume=this.routes.has(sample)?1:audible?volumeGain(this.settings.sfx):0
     for(let i=0;i<2;i++){
       this.decks[i].volume=this.musicBus?1:audible&&i===this.deck?volumeGain(this.settings.music):0
