@@ -1,3 +1,4 @@
+import { projectileCount, type Spell } from './spells.ts'
 import { GRAVITY, MAX_LAUNCH_SPEED, PLAYER_HEIGHT, PLAYER_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.ts'
 import { type Player, type Terrain, surfaceAt } from './terrain.ts'
 
@@ -40,6 +41,12 @@ export function createShot(player: Player): Shot {
 
 export function createSpreadShots(player: Player, spread = Math.PI / 24): Shot[] {
   return [-spread, 0, spread].map(offset => createShot({...player, aimAngle: player.aimAngle + offset}))
+}
+
+export function createWeaponShots(player:Player,spell:Spell):Shot[]{
+  const count=projectileCount(spell)
+  const step=spell.effect==='ice'?Math.PI/90:spell.effect==='fire'?Math.PI/60:Math.PI/24
+  return Array.from({length:count},(_,i)=>createShot({...player,aimAngle:player.aimAngle+(i-(count-1)/2)*step}))
 }
 
 function segmentBoxHit(x0: number, y0: number, x1: number, y1: number, player: Player): number | undefined {
