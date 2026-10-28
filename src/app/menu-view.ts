@@ -37,6 +37,7 @@ export function menuMarkup(background:string,hero:string,logo:string,shipArt:rea
       </div><p class="setting-caption" id="mode-note"></p></div>
       <div class="setting-block"><h3 id="players-label">PLAYERS</h3><div class="count-choices" role="group" aria-labelledby="players-label">${[2,3,4].map(count=>`<button class="choice" data-count="${count}"></button>`).join('')}</div><p class="setting-caption" id="total-ships"></p></div>
       <div class="setting-block difficulty-block" id="difficulty-setting"><h3 id="difficulty-heading">DIFFICULTY</h3><div class="difficulty-choices" role="group" aria-labelledby="difficulty-heading">${['easy','normal','hard'].map(level=>`<button class="choice" data-difficulty="${level}">${level.toUpperCase()}</button>`).join('')}</div></div>
+      <button id="start-battle" class="menu-button primary start-battle"><span>START BATTLE</span>${icon('arrow')}</button>
     </section>
     <section class="setup-card setup-ships" aria-label="Choose your ship"><h3>CHOOSE YOUR SHIP</h3>
       <div id="hero-ship" class="setup-hero" aria-hidden="true"></div><div class="setup-hover-ring" aria-hidden="true"></div>
@@ -44,7 +45,6 @@ export function menuMarkup(background:string,hero:string,logo:string,shipArt:rea
       <div class="ship-choices" role="group" aria-label="Player 1 ship">${SHIPS.map((ship,i)=>`<button class="choice" data-ship="${i}" aria-label="Choose ${ship.name}"><img src="${shipArt[i]}" alt="" width="256" height="144"><span>${ship.name}</span></button>`).join('')}</div>
     </section>
   </div>
-  <button id="start-battle" class="menu-button primary start-battle"><span>START BATTLE</span>${icon('arrow')}</button>
 </section>
 <section id="pause-view" class="menu-page pause-page" aria-labelledby="pause-title" hidden><div class="pause-card setup-card">
   <p class="small-brand">ALIEN WAR</p><h2 id="pause-title">PAUSED</h2>
