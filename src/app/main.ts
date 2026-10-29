@@ -1,4 +1,4 @@
-import { supportReady } from '../game/match.ts'
+import { supportReady, supportCountdown } from '../game/match.ts'
 import type { GameMode, Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
 import '../styles/style.css'
@@ -21,8 +21,8 @@ ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
 </section>
 <footer class="command-bar" aria-label="Weapon controls">
-  <section id="support-choice" aria-label="Choose support" hidden><p>SUPPORT READY · CHOOSE ONE</p><div><button id="support-heal">✚ HEAL +20</button><button id="support-shield">⬡ SHIELD 20</button></div></section>
-  <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" title="${spell.name}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.effect}.jpeg" alt="" /></span><span>${['PLASMA','ACID','FLAME','CRYO'][i]}</span></button>`).join('')}</div>
+<div class="equipment-controls">  <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" title="${spell.name}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.effect}.jpeg" alt="" /></span><span>${['PLASMA','ACID','FLAME','CRYO'][i]}</span></button>`).join('')}</div>
+<section id="support-choice" aria-label="Heal or shield support"><button id="support-heal" class="support-button" disabled><span class="support-icon" aria-hidden="true">✚</span><span class="support-name">HEAL</span><span class="support-lock" aria-hidden="true">🔒 3</span></button><button id="support-shield" class="support-button" disabled><span class="support-icon" aria-hidden="true">⬡</span><span class="support-name">SHIELD</span><span class="support-lock" aria-hidden="true">🔒 3</span></button></section></div>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
 </footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
 
@@ -98,10 +98,19 @@ scene.setHud(({match,spell,aimFeedback})=>{
   const readout=document.querySelector<HTMLElement>('#ship-aim-info')!
   // The scene reserves the protruding wheel/support band below its viewport.
   aimWheel.style.top='';aimWheel.style.bottom=''
-  const support=document.querySelector<HTMLElement>('#support-choice')!
-  support.hidden=!(ready&&supportReady(match))
-  document.querySelector<HTMLButtonElement>('#support-heal')!.disabled=player.health>=100
-  document.querySelector<HTMLButtonElement>('#support-shield')!.disabled=player.shield>=20
+  const remaining=supportCountdown(match),available=supportReady(match)
+  for(const choice of ['heal','shield'] as const){
+    const button=document.querySelector<HTMLButtonElement>(`#support-${choice}`)!
+    const full=choice==='heal'?player.health>=100:player.shield>=20
+    button.disabled=!ready||!available||full
+    button.classList.toggle('locked',remaining>0)
+    button.classList.toggle('support-ready',available&&!full)
+    const state=remaining>0?`🔒 ${remaining}`:full?'FULL':ready?'READY':'NEXT'
+    button.querySelector('.support-lock')!.textContent=state
+    const label=choice==='heal'?'Heal +20 HP':'Shield 20'
+    button.setAttribute('aria-label',remaining>0?`${label}, locked: ${remaining} of your turns remaining`:full?`${label}, already full`:`${label}, ${ready?'ready':'available next turn'}`)
+    button.title=button.getAttribute('aria-label')!
+  }
   readout.style.opacity=String(aimFeedback.alpha)
   readout.setAttribute('aria-hidden',String(aimFeedback.alpha===0))
   // Keep the two small panels on screen even when a ship is near a world edge.

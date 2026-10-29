@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createMatch,fire,supportReady,useSupport,damagePlayer,applyShotResult,updateMatch} from '../src/game/match.ts'
+import {createMatch,fire,supportReady,supportCountdown,useSupport,damagePlayer,applyShotResult,updateMatch} from '../src/game/match.ts'
 import {SPELLS,weaponBlast,projectileCount} from '../src/game/spells.ts'
 function fireThree(m,id=0){for(let i=0;i<3;i++){m.active=id;m.phase='MovementAiming';m.players[id].grounded=true;assert.equal(fire(m),true)}}
 test('each player earns one support choice every three valid shots, usable only on their aiming turn',()=>{
@@ -50,4 +50,24 @@ test('staggered flame pellets cannot refresh extra burning damage within one vol
  hit();updateMatch(m,.5);hit();hit();assert.equal(m.burns[0].remaining,5)
  for(let i=0;i<5;i++)updateMatch(m,.5)
  assert.equal(p.health,64)
+})
+
+test('support countdown is personal, unlocks at three and restarts after choosing',()=>{
+ const m=createMatch(42,4)
+ assert.equal(supportCountdown(m),3)
+ for(const expected of [2,1,0]){
+  m.phase='MovementAiming';m.players[0].grounded=true;fire(m)
+  assert.equal(supportCountdown(m),expected);assert.equal(supportCountdown(m,1),3)
+ }
+ assert.equal(supportReady(m),false) // third shot still flying
+ m.phase='MovementAiming';assert.equal(supportReady(m),true)
+ useSupport(m,'shield');assert.equal(supportCountdown(m),3)
+ assert.equal(supportCountdown(createMatch()),3)
+})
+
+test('using a saved unlock starts a fresh three-shot cooldown',()=>{
+ const m=createMatch();fireThree(m);m.phase='MovementAiming';m.players[0].grounded=true;fire(m)
+ m.phase='MovementAiming';assert.equal(supportCountdown(m),0)
+ useSupport(m,'shield');assert.equal(supportCountdown(m),3)
+ m.players[0].grounded=true;fire(m);assert.equal(supportCountdown(m),2)
 })
