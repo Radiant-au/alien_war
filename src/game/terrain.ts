@@ -31,6 +31,7 @@ export interface Player {
   x: number;
   y: number;
   health: number;
+  shield: number;
   aimAngle: number;
   power: number;
   grounded: boolean;
@@ -136,6 +137,7 @@ export function createPlayers(terrain: Terrain, count = 2): Player[] {
       x,
       y: 0,
       health: 100,
+      shield: 0,
       aimAngle: x < WORLD_WIDTH / 2 ? -Math.PI / 4 : (-Math.PI * 3) / 4,
       power: 0.58,
       grounded: true,

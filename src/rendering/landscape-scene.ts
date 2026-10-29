@@ -5,7 +5,7 @@ import { AiController, computerTurn, type GameMode, type Difficulty } from '../g
 import Phaser from 'phaser'
 import { aimFeedbackAlpha, dragAim } from '../game/aim.ts'
 import { WORLD_WIDTH, SHIP_RENDER_SCALE } from '../game/config.ts'
-import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, type Match } from '../game/match.ts'
+import { applyShotResult, createMatch, finishShot, fire, overviewScrollX, overviewZoom, updateMatch, supportReady, useSupport, type SupportChoice, type Match } from '../game/match.ts'
 import { createShot, createWeaponShots, PROJECTILE_SPEED_MULTIPLIER, STEP_SECONDS, stepShot, trajectory, type Shot } from '../game/projectile.ts'
 import { nextTerrainVariant, surfaceAt, type Player } from '../game/terrain.ts'
 import { SPELLS, weaponBlast, type Spell } from '../game/spells.ts'
@@ -78,7 +78,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.load.image('cryo-spikes',cryoSpikesUrl)
     this.load.spritesheet('missile-fire','/assets/fire_cluster_spritesheet.svg',{frameWidth:256,frameHeight:128})
     this.load.spritesheet('electric-impact','/assets/electric_weapon_16.png',{frameWidth:256,frameHeight:256})
-    this.load.spritesheet('missile-ice','/assets/cryo_shards_spritesheet.svg',{frameWidth:128,frameHeight:64})
+    this.load.spritesheet('missile-ice','/assets/ice_missile_spritesheet.svg',{frameWidth:128,frameHeight:64})
     for(const type of ['poison','electric'])this.load.spritesheet(`missile-${type}`,`/assets/${type}_missile_spritesheet.svg`,{frameWidth:128,frameHeight:64})
   }
   create(){
@@ -165,6 +165,18 @@ export class LandscapeScene extends Phaser.Scene {
     if(!enabled)this.clearInputs()
   }
   cast(){if(this.humanReady)this.fireWeapon()}
+  support(choice:SupportChoice){
+    if(!this.gameplayEnabled||(!this.humanReady&&!this.isComputerTurn))return false
+    const amount=useSupport(this.match,choice)
+    if(!amount)return false
+    const player=this.match.players[this.match.active],pose=shipPose(this.match.terrain,player,this.elapsed,this.reducedMotion)
+    this.polish?.support(player.id,choice)
+    if(choice==='heal'){
+      const text=this.add.text(player.x,pose.y-24-24/this.cameras.main.zoom,`+${amount}`,{fontFamily:'Arial, sans-serif',fontSize:`${Math.round(24/this.cameras.main.zoom)}px`,fontStyle:'bold',color:'#a4ff9a',stroke:'#123e2e',strokeThickness:3}).setOrigin(.5).setDepth(20)
+      this.animateEffect(text,{y:text.y-32/this.cameras.main.zoom,alpha:0,duration:this.reducedMotion?300:900})
+    }
+    return true
+  }
   private fireWeapon(){
     if(!this.gameplayEnabled)return
     if(!fire(this.match))return
@@ -192,7 +204,7 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private resizeView=()=>{
     if(!this.actors)return
-    const height=this.scale.height-document.querySelector('.command-bar')!.getBoundingClientRect().height
+    const height=this.scale.height-document.querySelector('.command-bar')!.getBoundingClientRect().height-104
     this.cameras.main.setViewport(0,0,this.scale.width,Math.max(1,height))
     this.match.viewWidth=960;this.match.cameraZoom=overviewZoom(this.match.players,960)
     this.match.cameraX=overviewScrollX(this.match.players,this.match.cameraZoom,960)
@@ -287,6 +299,10 @@ export class LandscapeScene extends Phaser.Scene {
   update(_time:number,delta:number){
     if(!this.gameplayEnabled)return
     this.elapsed+=Math.min(delta,100)/1000
+    if(this.isComputerTurn&&supportReady(this.match)){
+      const player=this.match.players[this.match.active]
+      this.support(player.health<=80?'heal':'shield')
+    }
     const aiAction=this.isComputerTurn?this.ai.tick(this.match,this.difficulty,Math.min(delta,100)/1000):{axis:0 as const}
     if('plan' in aiAction&&aiAction.plan){
       const p=this.match.players[this.match.active]
@@ -317,7 +333,8 @@ export class LandscapeScene extends Phaser.Scene {
       }
       updateMatch(this.match,STEP_SECONDS,axis)
       for(const id of this.match.damageTicks){this.poisonTick(id);this.polish?.poison(id)}
-      this.polish?.observe(this.match.players,this.match.damageTicks.length?'poison':this.shotSpell.effect)
+      for(const id of this.match.burnTicks)this.poisonTick(id,true)
+      this.polish?.observe(this.match.players,this.match.damageTicks.length?'poison':this.match.burnTicks.length?'fire':this.shotSpell.effect)
       this.stepAccumulator-=STEP_SECONDS
     }
     if(beforePhase!==this.match.phase)this.clearInputs()
@@ -368,7 +385,7 @@ export class LandscapeScene extends Phaser.Scene {
     if(fired&&this.elapsed-fired.time>=.65)this.recoil.delete(player.id)
     g.save();g.translateCanvas(pose.x+recoil.x,pose.y+recoil.y);g.rotateCanvas(tilt+recoil.angle);g.scaleCanvas(dir*SHIP_RENDER_SCALE,SHIP_RENDER_SCALE)
     const thrust=this.moving[kind]&&!this.reducedMotion?.5+Math.sin(this.elapsed*18)*.25:0
-    drawShip(g,kind,thrust);this.polish?.drawShip(g,player.id,this.match.poisons.some(p=>p.player===player.id),this.elapsed,this.reducedMotion);this.cryo?.drawShip(g,player.id,this.reducedMotion);g.restore()
+    drawShip(g,kind,thrust);this.polish?.drawShip(g,player.id,this.match.poisons.some(p=>p.player===player.id),this.elapsed,this.reducedMotion);this.cryo?.drawShip(g,player.id,this.reducedMotion);this.polish?.drawSupport(g,player,this.match.burns.some(b=>b.player===player.id),this.elapsed,this.reducedMotion);g.restore()
     // The weapon keeps the world-space aim angle while the hull follows the slope.
     g.save();g.translateCanvas(player.x+recoil.x,pose.y+4+recoil.y);g.rotateCanvas(player.aimAngle);g.scaleCanvas(1.5,1.5)
     g.fillStyle(0x172941);g.fillRoundedRect(5,-4,24,8,3)
@@ -402,9 +419,9 @@ export class LandscapeScene extends Phaser.Scene {
     })
   }
   private clearMissile(){for(const missile of this.volleyMissiles)missile.destroy();this.volleyMissiles=[];this.volleyShots=[]}
-  private poisonTick(id:number){
+  private poisonTick(id:number,burning=false){
     const player=this.match.players[id],zoom=this.cameras.main.zoom
-    const tick=this.add.text(player.x,player.y-52,'−1',{fontFamily:'Arial, sans-serif',fontSize:`${Math.round(22/zoom)}px`,fontStyle:'bold',color:'#b0ff57',stroke:'#152c24',strokeThickness:3/zoom}).setOrigin(.5).setDepth(20)
+    const tick=this.add.text(player.x,player.y-24-24/zoom-(burning?16/zoom:0),'−1',{fontFamily:'Arial, sans-serif',fontSize:`${Math.round(22/zoom)}px`,fontStyle:'bold',color:player.shield>0?'#80efff':burning?'#ffb55b':'#b0ff57',stroke:'#152c24',strokeThickness:3/zoom}).setOrigin(.5).setDepth(20)
     this.animateEffect(tick,{y:tick.y-(this.reducedMotion?8:34)/zoom,alpha:0,duration:this.reducedMotion?250:650,ease:'Cubic.Out'})
   }
   private impact(x:number,spell:Spell,target:'terrain'|number){

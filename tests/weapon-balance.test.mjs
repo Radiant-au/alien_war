@@ -6,8 +6,8 @@ import { explosionDamage } from '../src/game/terrain.ts'
 import { PLAYER_WIDTH, PLAYER_HEIGHT, SHIP_RENDER_SCALE } from '../src/game/config.ts'
 import { createShot, sweepShot } from '../src/game/projectile.ts'
 
-test('a complete weapon shot removes at most 45–55 direct health with acid reserved for gradual damage',()=>{
-  const budgets=[45,0,51,55]
+test('a complete weapon shot removes at most 30–36 direct health with acid reserved for gradual damage',()=>{
+  const budgets=[36,0,30,30]
   for(let i=0;i<SPELLS.length;i++){
     const match=createMatch(),target=match.players[1],spell=SPELLS[i],blast=weaponBlast(spell)
     const pellets=projectileCount(spell)

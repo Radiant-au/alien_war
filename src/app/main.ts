@@ -1,3 +1,4 @@
+import { supportReady } from '../game/match.ts'
 import type { GameMode, Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
 import '../styles/style.css'
@@ -12,7 +13,7 @@ import { shipOrder } from './preferences.ts'
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `${backgroundMarkup()}<main id="game-area" aria-label="Alien artillery battlefield"></main>
 <header class="hud" data-count="4">
-${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="player-name" title="${ship.name}">P${i+1}</span><div class="health-track" role="progressbar" aria-label="${ship.name} health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-${i}-bar"></i></div><strong id="health-${i}">100</strong></div>`).join('')}
+${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship-color:#${ship.color.toString(16)}"><span class="player-name" title="${ship.name}">P${i+1}</span><div class="health-track" role="progressbar" aria-label="${ship.name} health" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="health-${i}-bar"></i><i class="shield-layer" id="shield-${i}-bar"></i></div><span class="shield-label" id="shield-${i}" hidden></span><strong id="health-${i}">100</strong></div>`).join('')}
 <div class="brand"><h1><span>Alien</span><br><b>War</b></h1><p id="turn-status" role="status">Preparing arena</p></div></header>
 <nav class="utilities" aria-label="Match options"><label for="player-count" id="battle-mode">LOCAL</label><select id="player-count" aria-label="Local player count"><option value="2">2 players</option><option value="3">3 players</option><option value="4" selected>4 players</option></select><button id="main-menu">☰ Pause</button><button id="restart">↻ New match</button><button id="fullscreen" aria-label="Fullscreen">⛶</button></nav>
 <section class="field-controls" aria-label="Battlefield controls">
@@ -20,6 +21,7 @@ ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship
   <div class="movement-controls"><div class="movement-buttons"><button id="move-left" aria-label="Move left">◀</button><button id="move-right" aria-label="Move right">▶</button></div><div class="fuel-caption"><span>FUEL</span><output id="fuel-value">100%</output></div><div class="fuel-track" id="fuel-meter" role="progressbar" aria-label="Movement fuel" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="fuel-fill"></i></div></div>
 </section>
 <footer class="command-bar" aria-label="Weapon controls">
+  <section id="support-choice" aria-label="Choose support" hidden><p>SUPPORT READY · CHOOSE ONE</p><div><button id="support-heal">✚ HEAL +20</button><button id="support-shield">⬡ SHIELD 20</button></div></section>
   <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" title="${spell.name}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.effect}.jpeg" alt="" /></span><span>${['PLASMA','ACID','FLAME','CRYO'][i]}</span></button>`).join('')}</div>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
 </footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
@@ -66,6 +68,7 @@ document.querySelector('#aim-wheel')!.addEventListener('keydown',event=>{
   const elevation=Math.atan2(-Math.sin(player.aimAngle),Math.abs(Math.cos(player.aimAngle)))*180/Math.PI
   scene.aim(Math.max(3,Math.min(87,elevation+(e.code==='ArrowUp'?2:e.code==='ArrowDown'?-2:0))),Math.max(15,Math.min(100,player.power*100+(e.code==='ArrowRight'?3:e.code==='ArrowLeft'?-3:0))))
 })
+for(const choice of ['heal','shield'] as const)document.querySelector(`#support-${choice}`)!.addEventListener('click',()=>{resetWheel();scene.support(choice)})
 document.querySelector('#fire')!.addEventListener('click',()=>scene.cast())
 document.querySelector('#restart')!.addEventListener('click',()=>{resetWheel();scene.restart()})
 document.querySelector('#player-count')!.addEventListener('change',e=>{resetWheel();scene.restart(Number((e.target as HTMLSelectElement).value))})
@@ -79,7 +82,9 @@ for(const [id,axis]of [['move-left',-1],['move-right',1]]as const){
 window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLButtonElement)&&!(e.target instanceof HTMLSelectElement)){e.preventDefault();scene.cast()}})
 const displayedHealth=SHIPS.map(()=>100)
 let healthAnimationTime=performance.now()
+let displayedMatch=scene.match
 scene.setHud(({match,spell,aimFeedback})=>{
+  if(match!==displayedMatch){displayedMatch=match;displayedHealth.fill(100)}
   const now=performance.now(),healthTicks=now-healthAnimationTime>=24?1:0
   if(healthTicks)healthAnimationTime=now
   const ready=scene.humanReady,player=match.players[match.active]
@@ -91,12 +96,12 @@ scene.setHud(({match,spell,aimFeedback})=>{
   aimWheel.style.setProperty('--wheel-y',`${Math.sin(player.aimAngle)*player.power*knobRange}px`)
   aimWheel.style.setProperty('--wheel-angle',`${player.aimAngle*180/Math.PI}deg`)
   const readout=document.querySelector<HTMLElement>('#ship-aim-info')!
-  const wheelRect=aimWheel.getBoundingClientRect(),shipX=aimFeedback.x,shipY=aimFeedback.y
-  if(shipX>wheelRect.left-42&&shipX<wheelRect.right+42&&shipY>wheelRect.top-32&&shipY<wheelRect.bottom+32){
-    const commandTop=document.querySelector('.command-bar')!.getBoundingClientRect().top
-    aimWheel.style.top=`${Math.max(8,Math.min(commandTop-wheelRect.height-12,shipY-wheelRect.height-24))}px`
-    aimWheel.style.bottom='auto'
-  }else{aimWheel.style.top='';aimWheel.style.bottom=''}
+  // The scene reserves the protruding wheel/support band below its viewport.
+  aimWheel.style.top='';aimWheel.style.bottom=''
+  const support=document.querySelector<HTMLElement>('#support-choice')!
+  support.hidden=!(ready&&supportReady(match))
+  document.querySelector<HTMLButtonElement>('#support-heal')!.disabled=player.health>=100
+  document.querySelector<HTMLButtonElement>('#support-shield')!.disabled=player.shield>=20
   readout.style.opacity=String(aimFeedback.alpha)
   readout.setAttribute('aria-hidden',String(aimFeedback.alpha===0))
   // Keep the two small panels on screen even when a ship is near a world edge.
@@ -113,11 +118,14 @@ scene.setHud(({match,spell,aimFeedback})=>{
     card.querySelector('.player-name')!.textContent=scene.mode==='ai'&&i>0?`AI${i}`:`P${i+1}`
     const p=match.players[i];card.hidden=!p
     if(!p)return
-    if(p.health>displayedHealth[i])displayedHealth[i]=p.health
+    if(p.health>displayedHealth[i]&&healthTicks)displayedHealth[i]=Math.min(p.health,displayedHealth[i]+2)
     else if(healthTicks>0&&p.health<displayedHealth[i])displayedHealth[i]=Math.max(p.health,displayedHealth[i]-healthTicks)
+    const shield=Math.max(0,p.shield??0),shieldLabel=document.querySelector<HTMLElement>(`#shield-${i}`)!
+    shieldLabel.hidden=shield===0;shieldLabel.textContent=`⬡ ${shield}`;shieldLabel.setAttribute('aria-label',`${shield} shield health`)
+    document.querySelector<HTMLElement>(`#shield-${i}-bar`)!.style.width=`${shield/20*100}%`
     const shownHealth=displayedHealth[i]
     document.querySelector(`#health-${i}`)!.textContent=String(shownHealth)
-    card.title=p.health>0?`${SHIPS[scene.shipKinds[i]].name}: ${shownHealth} health`:`${SHIPS[scene.shipKinds[i]].name}: eliminated`
+    card.title=p.health>0?`${SHIPS[scene.shipKinds[i]].name}: ${shownHealth} health${shield?` + ${shield} shield`:''}`:`${SHIPS[scene.shipKinds[i]].name}: eliminated`
     document.querySelector<HTMLElement>(`#health-${i}-bar`)!.style.width=`${shownHealth}%`
     card.querySelector('.health-track')!.setAttribute('aria-valuenow',String(shownHealth))
     card.classList.toggle('active',match.active===i&&scene.gameplayEnabled&&match.phase==='MovementAiming');card.classList.toggle('eliminated',p.health<=0)

@@ -22,8 +22,8 @@ test('poison elimination resolves winner and stops after game over',()=>{
  updateMatch(m,10);assert.deepEqual(m.damageTicks,[])
 })
 test('weapons have a modest reduction from original budgets',()=>{
- assert.deepEqual(SPELLS.map(s=>s.damage),[45,18,51,55])
- assert.equal(weaponBlast(SPELLS[0]).damage*3,45)
+ assert.deepEqual(SPELLS.map(s=>s.damage),[36,18,30,30])
+ assert.equal(weaponBlast(SPELLS[0]).damage*3,36)
 })
 test('result allows replay and main menu but cannot resume an ended battle',()=>{
  const n=new MenuNavigation();n.setup();n.start();n.finish();assert.equal(n.view,'result');assert.equal(n.resume(),false)
