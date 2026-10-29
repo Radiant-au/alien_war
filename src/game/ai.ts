@@ -1,6 +1,6 @@
 import { createWeaponShots, stepShot, type TerminalResult } from './projectile.ts'
 import { explosionDamage, type Player, type Terrain } from './terrain.ts'
-import { SPELLS, weaponBlast } from './spells.ts'
+import { SPELLS, weaponBlast, BURN_DAMAGE, projectileCount } from './spells.ts'
 import type { Match } from './match.ts'
 
 export type GameMode = 'local' | 'ai'
@@ -21,7 +21,7 @@ function scoreImpact(result:TerminalResult|undefined,shooter:Player,players:Play
   for(const p of players){
     if(p.health<=0)continue
     const hit=explosionDamage(p,result.x,result.y,radius,damage)
-    score+=p.id===shooter.id?-hit*3:Math.min(hit,p.health)*2+(hit>=p.health?45:0)
+    score+=p.id===shooter.id?-hit*3:Math.min(hit,p.health+(p.shield??0))*2+(hit>=p.health+(p.shield??0)?45:0)
   }
   return score
 }
@@ -44,7 +44,7 @@ export function* searchAiShot(terrain:Terrain,players:Player[],active:number,dif
           if(result)break
           if(step%32===0)yield
         }
-        score+=scoreImpact(result,shooter,players,s.radius,weaponBlast(s).damage)
+        score+=scoreImpact(result,shooter,players,s.radius,weaponBlast(s).damage+(s.effect==='fire'?BURN_DAMAGE/projectileCount(s):0))
       }
       if(score>best.score)best={angle,power,spell,score}
     }

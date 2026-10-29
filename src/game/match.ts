@@ -1,3 +1,4 @@
+import { BURN_DAMAGE } from './spells.ts'
 import { CAMERA_TRANSITION_SECONDS, EXPLOSION_RADIUS, MOVEMENT_ALLOWANCE, VIEW_WIDTH, WORLD_WIDTH } from './config.ts'
 import { movePlayer, stepPlayerGravity } from './movement.ts'
 import { createShot, type Shot, type TerminalResult } from './projectile.ts'
@@ -7,6 +8,10 @@ export type Phase = 'InitialCameraTransition' | 'MovementAiming' | 'ProjectileFl
 
 export interface Match {
   poisons: { player: number; remaining: number; elapsed: number }[]
+  burnGrants: number[]
+  burns: { player: number; remaining: number; elapsed: number }[]
+  burnTicks: number[]
+  support: {shots:number;ready:boolean}[]
   damageTicks: number[]
   terrain: Terrain
   players: Player[]
@@ -50,7 +55,7 @@ export function createMatch(seed = 0x51a7, count = 2, variant?: number): Match {
   const terrain = createTerrain(seed, count, variant)
   const players = createPlayers(terrain, count)
   return {
-    poisons: [], damageTicks: [],
+    poisons: [], damageTicks: [], burns: [], burnGrants: [], burnTicks: [], support: players.map(()=>({shots:0,ready:false})),
     viewWidth: VIEW_WIDTH,
     terrain,
     players,
@@ -69,6 +74,10 @@ export function createMatch(seed = 0x51a7, count = 2, variant?: number): Match {
 export function fire(match: Match): boolean {
   const player = match.players[match.active]
   if (match.phase !== 'MovementAiming' || !player.grounded || player.health === 0 || match.pointerId !== undefined) return false
+  const support=match.support[player.id]
+  support.shots++
+  if(support.shots%3===0)support.ready=true
+  match.burnGrants=[]
   match.shot = createShot(player)
   match.phase = 'ProjectileFlight'
   match.accumulator = 0
@@ -96,7 +105,15 @@ export function applyShotResult(match: Match, result: TerminalResult, blast: { r
         }
         continue
       }
-      player.health = Math.max(0, player.health - damage)
+      damagePlayer(player,damage)
+      if(blast.effect==='fire'&&damage>0&&player.health>0){
+        const remaining=explosionDamage(player,result.x,result.y,radius,BURN_DAMAGE)
+        const existing=match.burns.find(b=>b.player===player.id)
+        const granted=match.burnGrants[player.id]??0,additional=Math.max(0,remaining-granted)
+        match.burnGrants[player.id]=Math.max(granted,remaining)
+        if(existing)existing.remaining=granted===0?Math.max(existing.remaining,remaining):Math.min(BURN_DAMAGE,existing.remaining+additional)
+        else if(additional>0)match.burns.push({player:player.id,remaining:additional,elapsed:0})
+      }
       if (damage > 0 && player.health > 0) {
         player.grounded = false
         player.velocityY = -Math.min(360, 120 + damage * 2)
@@ -143,17 +160,24 @@ function stepCamera(match: Match, dt: number): void {
 }
 
 export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 = 0): void {
-  match.damageTicks = []
+  match.damageTicks = [];match.burnTicks=[]
   if (match.phase === 'GameOver') return
   for (const poison of match.poisons) {
     const player = match.players[poison.player]
     poison.elapsed += dt
     while (poison.elapsed >= .5 && poison.remaining > 0 && player.health > 0) {
-      poison.elapsed -= .5; poison.remaining--; player.health--
+      poison.elapsed -= .5; poison.remaining--; damagePlayer(player,1)
       match.damageTicks.push(player.id)
     }
   }
   match.poisons = match.poisons.filter(p => p.remaining > 0 && match.players[p.player].health > 0)
+  for(const burn of match.burns){
+    const player=match.players[burn.player];burn.elapsed+=dt
+    while(burn.elapsed>=.5&&burn.remaining>0&&player.health>0){
+      burn.elapsed-=.5;burn.remaining--;damagePlayer(player,1);match.burnTicks.push(player.id)
+    }
+  }
+  match.burns=match.burns.filter(b=>b.remaining>0&&match.players[b.player].health>0)
   // Resolve deaths at safe phase boundaries, including a poisoned active player.
   if (match.phase === 'MovementAiming' && (match.players[match.active].health <= 0 || match.players.filter(p => p.health > 0).length <= 1)) match.phase = 'WinnerCheck'
   switch (match.phase) {
@@ -203,3 +227,24 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
 }
 
 
+
+/** Shields absorb direct and status damage before hull health. */
+export function damagePlayer(player:Player,amount:number){
+  if(player.health<=0)return
+  const damage=Math.max(0,Math.round(amount)),absorbed=Math.min(player.shield??0,damage)
+  player.shield=Math.max(0,(player.shield??0)-absorbed)
+  player.health=Math.max(0,player.health-(damage-absorbed))
+}
+export type SupportChoice='heal'|'shield'
+export function supportReady(match:Match){return match.phase==='MovementAiming'&&match.players[match.active].health>0&&match.support[match.active].ready}
+/** Choosing support never consumes the firing action; invalid/full choices keep the unlock. */
+export function useSupport(match:Match,choice:SupportChoice):number{
+  if(!supportReady(match)||match.pointerId!==undefined)return 0
+  const player=match.players[match.active]
+  const amount=choice==='heal'?Math.min(20,100-player.health):Math.max(0,20-(player.shield??0))
+  if(amount<=0)return 0
+  if(choice==='heal')player.health+=amount
+  else player.shield=20
+  match.support[player.id].ready=false
+  return amount
+}

@@ -212,7 +212,7 @@ async function loadOpening(){
   let progressFrame=0
   const assets=[
     'fire_cluster_spritesheet.svg','electric_weapon_16.png',
-    'cryo_shards_spritesheet.svg','poison_missile_spritesheet.svg',
+    'ice_missile_spritesheet.svg','poison_missile_spritesheet.svg',
     'electric_missile_spritesheet.svg',
     'ice.jpeg','poison.jpeg','electric.jpeg','fire.jpeg',
   ]
