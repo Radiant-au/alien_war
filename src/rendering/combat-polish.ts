@@ -1,13 +1,11 @@
-import {createAcidSplash,ACID_SPLASH,ACID_FRAMES} from './acid-splash.ts'
 import Phaser from 'phaser'
 import { surfaceAt, type Player, type Terrain } from '../game/terrain.ts'
 import type { Spell } from '../game/spells.ts'
 type Effect=Spell['effect']
 interface Burst{x:number;y:number;age:number;duration:number;angle:number;effect:Effect;kind:'muzzle'|'soil'|'death'}
-interface Acid{x:number;age:number;duration:number;radius:number;splash:Phaser.GameObjects.Image}
+interface Acid{x:number;age:number;duration:number;radius:number}
 /** Bounded, simulation-time cosmetics; pause/restart cannot leave background timers. */
 export class CombatPolish{
- private scene:Phaser.Scene
  private supportPulses=new Map<number,{kind:'heal'|'shield'|'break';age:number}>()
  private shields:number[]=[]
  private g:Phaser.GameObjects.Graphics
@@ -16,11 +14,11 @@ export class CombatPolish{
  private reactions=new Map<number,{effect:Effect;age:number}>()
  private health:number[]=[]
  private clock=0
- constructor(scene:Phaser.Scene){this.scene=scene;createAcidSplash(scene);this.g=scene.add.graphics().setDepth(4);scene.events.once(Phaser.Scenes.Events.SHUTDOWN,()=>{this.clear([]);this.g.destroy()})}
- clear(players:Player[]){for(const p of this.acids)p.splash.destroy();this.supportPulses.clear();this.shields=players.map(p=>p.shield??0);this.clock=0;this.bursts=[];this.acids=[];this.reactions.clear();this.health=players.map(p=>p.health+(p.shield??0));this.g.clear()}
+ constructor(scene:Phaser.Scene){this.g=scene.add.graphics().setDepth(4);scene.events.once(Phaser.Scenes.Events.SHUTDOWN,()=>{this.clear([]);this.g.destroy()})}
+ clear(players:Player[]){this.supportPulses.clear();this.shields=players.map(p=>p.shield??0);this.clock=0;this.bursts=[];this.acids=[];this.reactions.clear();this.health=players.map(p=>p.health+(p.shield??0));this.g.clear()}
  muzzle(x:number,y:number,angle:number,effect:Effect){this.add({x,y,angle,effect,age:0,duration:.16,kind:'muzzle'})}
  debris(x:number,y:number){this.add({x,y,angle:0,effect:'ice',age:0,duration:.65,kind:'soil'})}
- acid(x:number,radius:number,duration:number){const splash=this.scene.add.image(x,0,ACID_SPLASH,0).setOrigin(.5,.88).setDepth(4);this.acids.push({x,radius,duration,age:0,splash});if(this.acids.length>8)this.acids.shift()!.splash.destroy()}
+ acid(x:number,radius:number,duration:number){this.acids.push({x,radius,duration,age:0});if(this.acids.length>8)this.acids.shift()}
  private add(b:Burst){this.bursts.push(b);if(this.bursts.length>36)this.bursts.shift()}
  observe(players:Player[],effect:Effect){
   for(const p of players){const total=p.health+(p.shield??0),before=this.health[p.id]??total;if(total<before){this.reactions.set(p.id,{effect,age:0});if(p.health===0)this.add({x:p.x,y:p.y,angle:0,effect,age:0,duration:.55,kind:'death'})}if((this.shields[p.id]??0)>0&&(p.shield??0)===0)this.supportPulses.set(p.id,{kind:'break',age:0});this.shields[p.id]=p.shield??0;this.health[p.id]=total}
@@ -52,18 +50,27 @@ export class CombatPolish{
     }
    }g.restore()
   }
-  this.acids=this.acids.filter(p=>{p.age+=dt;if(p.age>=p.duration){p.splash.destroy();return false}return true})
+  this.acids=this.acids.filter(p=>(p.age+=dt)<p.duration)
   for(const p of this.acids){
-   const alpha=Math.min(1,(p.duration-p.age)/.65),y=surfaceAt(terrain,p.x)
-   p.splash.setPosition(p.x,y).setDisplaySize(p.radius*2.1,p.radius*1.4).setFrame(reduced?5:Math.min(ACID_FRAMES-1,Math.floor(p.age/.065))).setAlpha(p.age<.78?(reduced?.35:1):0)
-   g.fillStyle(0x489c18,alpha*.65);g.lineStyle(2,0x9bf340,alpha*.8)
-   g.beginPath();for(let i=0;i<=18;i++){const x=p.x+(i/18-.5)*p.radius*2,sy=surfaceAt(terrain,x);if(i===0)g.moveTo(x,sy);else g.lineTo(x,sy)}g.strokePath()
-   for(let i=18;i>=0;i--){const x=p.x+(i/18-.5)*p.radius*2;g.lineTo(x,surfaceAt(terrain,x)+6)}g.closePath();g.fillPath()
-
-   for(let i=0;i<(reduced?3:7);i++){
-    const x=p.x+(i/6-.5)*p.radius*1.6,sy=surfaceAt(terrain,x),loop=(p.age*.8+i*.17)%1
-    g.lineStyle(1.5,0xb0f76d,alpha*(1-loop)*.8);g.strokeCircle(x,sy-2-(reduced?0:loop*7),2+loop*3)
-    if(!reduced&&p.age<.65){const t=p.age/.65,dx=(i-3)*t*15;g.fillStyle(0x92f244,1-t);g.fillEllipse(p.x+dx,y-Math.sin(t*Math.PI)*(15+i%3*9),4,6)}
+   const alpha=Math.min(1,(p.duration-p.age)/.65)
+   // Restore a deep, bright liquid pool rather than a splash crown.
+   const width=p.radius*1.25
+   const ribbon=(offset:number,depth:number,color:number,opacity:number,edge?:number)=>{
+    g.fillStyle(color,alpha*opacity);if(edge)g.lineStyle(4,edge,alpha*.9)
+    g.beginPath()
+    for(let i=0;i<=24;i++){const x=p.x+(i/24-.5)*width*2,sy=surfaceAt(terrain,x)+offset;if(!i)g.moveTo(x,sy);else g.lineTo(x,sy)}
+    if(edge)g.strokePath()
+    for(let i=24;i>=0;i--){const t=i/24,x=p.x+(t-.5)*width*2;g.lineTo(x,surfaceAt(terrain,x)+offset+depth*Math.sin(t*Math.PI))}
+    g.closePath();g.fillPath()
+   }
+   ribbon(0,21,0x173d12,.96,0x5fff25)
+   ribbon(3,12,0x61c925,.84)
+   ribbon(4,4,0x9df443,.48)
+   for(let i=0;i<(reduced?4:9);i++){
+    const x=p.x+(i/8-.5)*width*1.8,sy=surfaceAt(terrain,x),loop=(p.age*.65+i*.173)%1
+    const pulse=reduced?.5:Math.sin(loop*Math.PI)
+    g.fillStyle(0xa9ff58,alpha*(.28+pulse*.3));g.fillEllipse(x,sy+6,10+pulse*8,3+pulse*2)
+    g.lineStyle(1.5,0xc4ff83,alpha*(.5+pulse*.4));g.strokeEllipse(x,sy+3-(reduced?0:pulse*3),4+pulse*5,3+pulse*4)
    }
   }
  }

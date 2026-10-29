@@ -458,7 +458,7 @@ export class LandscapeScene extends Phaser.Scene {
       if(!this.reducedMotion)for(let i=0;i<7;i++)this.risingParticle(x+(Math.random()-.5)*radius,groundY,0x6ffaff,radius*.8)
     }else if(spell.effect==='poison'){
       window.dispatchEvent(new Event('alien-war-poison-impact'))
-      const duration=Math.max(.5,...this.match.poisons.map(p=>p.remaining*.5))
+      const duration=Math.max(3,...this.match.poisons.map(p=>p.remaining*.5))
       this.polish?.acid(x,radius,duration)
     }else{
       this.cryo??=new CryoEffect(this)

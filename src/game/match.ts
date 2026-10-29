@@ -246,5 +246,12 @@ export function useSupport(match:Match,choice:SupportChoice):number{
   if(choice==='heal')player.health+=amount
   else player.shield=20
   match.support[player.id].ready=false
+  match.support[player.id].shots=0
   return amount
+}
+
+/** Counts this player's own firing actions, not global turns or volley pellets. */
+export function supportCountdown(match:Match,id=match.active):number{
+ const support=match.support[id]
+ return support.ready?0:3-support.shots%3
 }
