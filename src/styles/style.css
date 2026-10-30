@@ -90,3 +90,49 @@
 .field-controls{--wheel-size:108px}.field-controls .wheel-disc{width:108px;height:108px}.field-controls #aim-wheel{bottom:calc(var(--command-height,78px) - 54px)}.field-controls .wheel-knob{width:27px;height:27px}.field-controls .movement-controls{bottom:calc(var(--command-height,78px) + 12px)}
 @media(max-width:900px){.command-bar{padding-left:124px;padding-right:12px;gap:8px}.field-controls{--wheel-size:96px}.field-controls .wheel-disc{width:96px;height:96px}.field-controls #aim-wheel{left:12px;bottom:calc(var(--command-height,78px) - 48px)}.command-bar .spell{font-size:9px;padding:4px;gap:4px}.command-bar .spell-icon{width:28px;height:28px}.command-bar #fire{width:76px;font-size:18px}}
 @media(max-width:480px){.command-bar{padding-left:108px;padding-right:8px;min-height:106px;gap:6px}.equipment-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;width:100%}.command-bar .equipment-controls .spell-controls,#support-choice{display:contents}.command-bar .spell{flex-direction:column;justify-content:center;min-width:0;min-height:44px;padding:3px;gap:1px;font-size:7px}.command-bar .spell-icon{width:24px;height:24px}#support-choice .support-button{min-width:0;min-height:44px;flex-direction:column;gap:0;padding:2px 2px 11px;font-size:7px}.support-icon{font-size:17px}.support-lock{font-size:7px;bottom:1px}.field-controls{--wheel-size:84px}.field-controls .wheel-disc{width:84px;height:84px}.field-controls #aim-wheel{bottom:calc(var(--command-height,106px) - 42px)}.field-controls .wheel-knob{width:24px;height:24px}.command-bar #fire{width:56px;font-size:14px}}
+
+
+/* Responsive combat layout: reserve space for every control and device safe area. */
+#rotate-prompt{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;background:radial-gradient(ellipse at top,#203b63,#080f26 75%)}
+#rotate-prompt[hidden]{display:none}
+#rotate-prompt h2{margin:20px 0 8px;font-size:26px;color:#a3ffe5}
+#rotate-prompt p{max-width:280px;line-height:1.6;color:#bdd0e8}
+.rotate-phone{font-size:72px;color:#72e9dd}
+.hud{top:max(20px,env(safe-area-inset-top));left:max(28px,env(safe-area-inset-left));right:max(28px,env(safe-area-inset-right))}
+.utilities{right:max(26px,env(safe-area-inset-right))}
+.command-bar{padding-left:calc(144px + env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+@media(max-width:1100px){
+  .hud{gap:12px;left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right))}
+  .command-bar{padding-left:calc(124px + env(safe-area-inset-left))}
+  .field-controls #aim-wheel{left:calc(12px + env(safe-area-inset-left))}
+  .field-controls .movement-controls{right:max(16px,env(safe-area-inset-right))}
+}
+@media(max-height:600px) and (orientation:landscape){
+  .hud{top:max(8px,env(safe-area-inset-top));gap:10px}
+  .brand h1{font-size:20px}.brand h1 br{display:none}.brand p{font-size:9px;margin:5px 0 0}
+  .player-name{font-size:12px}.health-card{gap:4px}.health-track{height:12px}
+  .utilities{top:max(55px,calc(env(safe-area-inset-top) + 45px));gap:5px}
+  .utilities button,.utilities select{min-height:32px;padding:5px 7px}
+  .command-bar{min-height:68px;padding-top:5px;padding-bottom:max(5px,env(safe-area-inset-bottom));gap:8px;padding-left:calc(106px + env(safe-area-inset-left))}
+  .equipment-controls{flex-wrap:nowrap;gap:6px}
+  .command-bar .equipment-controls .spell-controls{gap:5px}
+  .command-bar .spell{flex-direction:column;justify-content:center;gap:1px;font-size:7px;min-width:38px;min-height:46px;padding:3px}
+  .command-bar .spell-icon{width:26px;height:26px}
+  #support-choice{gap:5px;padding-left:6px}
+  #support-choice .support-button{min-width:44px;min-height:46px;flex-direction:column;gap:0;padding:2px 4px 12px;font-size:7px}
+  .support-icon{font-size:17px}.support-lock{font-size:7px}
+  .field-controls{--wheel-size:84px}.field-controls .wheel-disc{width:84px;height:84px}
+  .field-controls #aim-wheel{bottom:calc(var(--command-height,68px) - 42px)}
+  .field-controls .wheel-knob{width:24px;height:24px}
+  .field-controls .movement-controls{bottom:calc(var(--command-height,68px) + 8px);width:108px}
+  .field-controls .movement-buttons button{height:40px}
+  .command-bar #fire{width:72px;height:44px;font-size:17px}
+}
+@media(max-width:700px) and (orientation:landscape){
+  .command-bar{padding-left:calc(90px + env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}
+  .command-bar .spell>span:last-child,.support-name{display:none}
+  .command-bar .spell{min-width:34px}.command-bar #fire{width:60px}
+  #support-choice .support-button{min-width:36px}
+  .field-controls .wheel-disc{width:72px;height:72px}
+  .field-controls #aim-wheel{left:calc(8px + env(safe-area-inset-left));bottom:calc(var(--command-height,68px) - 36px)}
+}

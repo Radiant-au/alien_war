@@ -174,10 +174,11 @@ window.addEventListener('alien-war-victory',event=>{
   const detail=(event as CustomEvent).detail
   navigation.finish();engine.pauseMatch()
   const winner=detail?.winner as number|undefined
-  get('#result-title').textContent=winner===undefined?'DRAW!':`${detail.mode==='ai'&&winner>0?'COMPUTER '+winner:'PLAYER '+(winner+1)} WINS!`
+  const defeated=detail?.outcome==='Defeat'
+  get('#result-title').textContent=defeated?'DEFEAT':winner===undefined?'DRAW!':`${detail.mode==='ai'&&winner>0?'COMPUTER '+winner:'PLAYER '+(winner+1)} WINS!`
   const ship=winner===undefined?undefined:detail.shipKinds[winner]
   get('#result-ship').innerHTML=ship===undefined?'✦':`<img src="${SHIP_ART[ship]}" alt="">`
-  get('#result-caption').textContent=winner===undefined?'An evenly matched battle':'Nice shot, Commander'
+  get('#result-caption').textContent=defeated?'Your ship was eliminated. Ready for a rematch?':winner===undefined?'An evenly matched battle':'Nice shot, Commander'
   renderNavigation()
 })
 get('#play-again').addEventListener('click',()=>{
@@ -266,5 +267,6 @@ async function loadOpening(){
     menu.inert=false
   }
 }
+
 
 
