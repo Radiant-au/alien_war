@@ -1,3 +1,4 @@
+import { needsLandscape } from '../rendering/viewport.ts'
 import { supportReady, supportCountdown } from '../game/match.ts'
 import type { GameMode, Difficulty } from '../game/ai.ts'
 import Phaser from 'phaser'
@@ -24,7 +25,7 @@ ${SHIPS.map((ship,i)=>`<div class="health-card" data-player="${i}" style="--ship
 <div class="equipment-controls">  <div class="spell-controls" role="group" aria-label="Choose weapon">${SPELLS.map((spell,i)=>`<button class="spell ${i===0?'selected':''}" data-spell="${i}" title="${spell.name}" aria-pressed="${i===0}"><span class="spell-icon"><img src="/assets/${spell.effect}.jpeg" alt="" /></span><span>${['PLASMA','ACID','FLAME','CRYO'][i]}</span></button>`).join('')}</div>
 <section id="support-choice" aria-label="Heal or shield support"><button id="support-heal" class="support-button" disabled><span class="support-icon" aria-hidden="true">✚</span><span class="support-name">HEAL</span><span class="support-lock" aria-hidden="true">🔒 3</span></button><button id="support-shield" class="support-button" disabled><span class="support-icon" aria-hidden="true">⬡</span><span class="support-name">SHIELD</span><span class="support-lock" aria-hidden="true">🔒 3</span></button></section></div>
   <button id="fire"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 4v12m0 16v12M4 24h12m16 0h12" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/></svg>FIRE</button>
-</footer><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
+</footer><section id="rotate-prompt" role="dialog" aria-modal="true" aria-labelledby="rotate-title" hidden><div class="rotate-phone" aria-hidden="true">↻ ▯</div><h2 id="rotate-title">Rotate your phone</h2><p>Turn your device sideways to play Alien War.</p></section><div id="ship-aim-info" aria-hidden="true"><div><strong id="ship-power">58</strong><span>POWER</span></div><div><strong id="ship-angle">45°</strong><span>ANGLE</span></div></div>`
 
 const commandBar=document.querySelector<HTMLElement>('.command-bar')!
 new ResizeObserver(()=>app.style.setProperty('--command-height',`${commandBar.getBoundingClientRect().height}px`)).observe(commandBar)
@@ -34,7 +35,7 @@ const startup=startupSignal()
 export const gameReady=startup.promise
 scene.onStartupReady=startup.ready
 scene.onStartupError=startup.fail
-new Phaser.Game({ type: Phaser.CANVAS, parent:'game-area', transparent:true, scale:{mode:Phaser.Scale.RESIZE,width:window.innerWidth,height:window.innerHeight},scene:[scene] })
+const game=new Phaser.Game({ type: Phaser.CANVAS, parent:'game-area', transparent:true, scale:{mode:Phaser.Scale.RESIZE,width:window.innerWidth,height:window.innerHeight},scene:[scene] })
 for (const button of document.querySelectorAll<HTMLButtonElement>('.spell')) {
   button.addEventListener('click',()=>scene.selectSpell(Number(button.dataset.spell)))
 }
@@ -162,10 +163,29 @@ export function startMatch(ship:number,count:number,mode:GameMode='local',diffic
   scene.shipKinds=shipOrder(ship)
   document.querySelector<HTMLSelectElement>('#player-count')!.value=String(count)
   scene.restart(count)
-  scene.setGameplayEnabled(true)
+  scene.setGameplayEnabled(true);syncOrientation()
   if(scene.sys.isPaused())scene.scene.resume()
 }
 export function pauseMatch(){
-  resetWheel();scene.setGameplayEnabled(false);if(!scene.sys.isPaused())scene.scene.pause()
+  resetWheel();scene.setGameplayEnabled(false);syncOrientation();if(!scene.sys.isPaused())scene.scene.pause()
 }
-export function resumeMatch(){scene.setGameplayEnabled(true);scene.scene.resume()}
+export function resumeMatch(){scene.setGameplayEnabled(true);syncOrientation();scene.scene.resume()}
+
+
+// Keep menu pause state independent from orientation so rotating cannot resume a paused match.
+const rotatePrompt=document.querySelector<HTMLElement>('#rotate-prompt')!
+const touchQuery=window.matchMedia('(any-pointer: coarse)')
+const syncOrientation=()=>{
+  const blocked=needsLandscape(app.clientWidth,app.clientHeight,touchQuery.matches||navigator.maxTouchPoints>0)
+  resetWheel();scene.setOrientationBlocked(blocked)
+  rotatePrompt.hidden=!blocked||!scene.gameplayEnabled||app.inert
+  for(const selector of ['.hud','.utilities','.field-controls','.command-bar','#ship-aim-info']){
+    const element=document.querySelector<HTMLElement>(selector)!
+    element.inert=blocked
+  }
+  game.scale.resize(app.clientWidth,app.clientHeight)
+}
+new ResizeObserver(syncOrientation).observe(app)
+new MutationObserver(syncOrientation).observe(app,{attributes:true,attributeFilter:['inert']})
+touchQuery.addEventListener('change',syncOrientation)
+syncOrientation()

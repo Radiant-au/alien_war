@@ -7,6 +7,8 @@ import { carveCrater, createPlayers, createTerrain, explosionDamage, type Player
 export type Phase = 'InitialCameraTransition' | 'MovementAiming' | 'ProjectileFlight' | 'Impact' | 'Settling' | 'WinnerCheck' | 'CameraTransition' | 'NextPlayerReady' | 'GameOver'
 
 export interface Match {
+  /** Defined only for solo matches against AI. */
+  humanPlayerId?: number
   poisons: { player: number; remaining: number; elapsed: number }[]
   burnGrants: number[]
   burns: { player: number; remaining: number; elapsed: number }[]
@@ -178,6 +180,13 @@ export function updateMatch(match: Match, dt: number, movementAxis: -1 | 0 | 1 =
     }
   }
   match.burns=match.burns.filter(b=>b.remaining>0&&match.players[b.player].health>0)
+  if (match.humanPlayerId !== undefined && match.players[match.humanPlayerId].health <= 0) {
+    match.outcome = match.players.every(p => p.health <= 0) ? 'Draw' : 'Defeat'
+    match.phase = 'GameOver'
+    match.shot = undefined
+    match.pointerId = undefined
+    return
+  }
   // Resolve deaths at safe phase boundaries, including a poisoned active player.
   if (match.phase === 'MovementAiming' && (match.players[match.active].health <= 0 || match.players.filter(p => p.health > 0).length <= 1)) match.phase = 'WinnerCheck'
   switch (match.phase) {
@@ -255,3 +264,4 @@ export function supportCountdown(match:Match,id=match.active):number{
  const support=match.support[id]
  return support.ready?0:3-support.shots%3
 }
+
