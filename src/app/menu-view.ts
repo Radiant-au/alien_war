@@ -33,6 +33,7 @@ export function menuMarkup(background:string,hero:string,logo:string,shipArt:rea
     <section class="setup-card setup-settings" aria-label="Match settings">
       <div class="setting-block"><h3 id="mode-heading">GAME MODE</h3><div class="mode-choices" role="group" aria-labelledby="mode-heading">
         <button data-mode="local" class="choice mode-card">${icon('people')}<span>LOCAL</span></button>
+        <button id="open-online" class="choice mode-card">${icon('people')}<span>ONLINE</span></button>
         <button data-mode="ai" class="choice mode-card">${icon('robot')}<span>VS AI</span></button>
       </div><p class="setting-caption" id="mode-note"></p></div>
       <div class="setting-block"><h3 id="players-label">PLAYERS</h3><div class="count-choices" role="group" aria-labelledby="players-label">${[2,3,4].map(count=>`<button class="choice" data-count="${count}"></button>`).join('')}</div><p class="setting-caption" id="total-ships"></p></div>

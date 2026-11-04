@@ -20,5 +20,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/app/**/*.ts", "src/game/**/*.ts", "src/rendering/**/*.ts", "src/terrain-burn.ts", "src/terrain-fire.ts"]
+  "include": ["src/app/**/*.ts", "src/network/**/*.ts", "shared/**/*.ts", "src/game/**/*.ts", "src/rendering/**/*.ts", "src/terrain-burn.ts", "src/terrain-fire.ts"]
 }
