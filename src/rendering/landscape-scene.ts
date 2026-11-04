@@ -1,3 +1,5 @@
+import type { Frame } from '../../shared/protocol.ts'
+import type { OnlineClient } from '../network/client.ts'
 import { viewportMetrics } from './viewport.ts'
 import { CombatPolish } from './combat-polish.ts'
 import cryoSpikesUrl from '../../assets/effects/cryo-spikes.webp'
@@ -28,6 +30,66 @@ const MISSILE_TEXTURES:Record<Spell['effect'],string>={
 }
 
 export class LandscapeScene extends Phaser.Scene {
+  online?:OnlineClient
+  onlineSlot=-1
+  onlineNames:Record<number,string>={}
+  onlinePaused=false
+  private onlineConnected=false
+  private onlineEvent=0
+  private onlineMatchId=''
+  private inputElapsed=0
+  private onlineMissileIds:number[]=[]
+  private networkTargets:Frame['shots']=[]
+  private networkPlayers:{x:number;y:number}[]=[]
+  private localAim?:{angle:number;power:number}
+  setOnlineConnected(connected:boolean){this.onlineConnected=connected;if(!connected)this.clearInputs()}
+  connectOnline(client:OnlineClient,slot:number){this.online=client;this.onlineSlot=slot;this.onlineConnected=client.connected;this.mode='local';this.onlineMatchId='';this.onlineEvent=0}
+  disconnectOnline(){this.clearInputs();this.online=undefined;this.onlineSlot=-1;this.onlineNames={};this.localAim=undefined;this.onlineMatchId='';this.onlinePaused=false}
+  receiveOnlineFrame(frame:Frame,initial=false){
+    if(!this.online)return
+    const fresh=frame.matchId!==this.onlineMatchId
+    if(fresh&&!frame.terrain)return
+    if(fresh){this.restart(frame.state.players.length);this.onlineMatchId=frame.matchId;this.onlineEvent=0;this.localAim=undefined}
+    const previous=this.match,terrain=frame.terrain??previous.terrain
+    const ownAim=this.localAim&&frame.state.active===this.onlineSlot&&previous.active===this.onlineSlot&&frame.state.phase==='MovementAiming'&&previous.phase==='MovementAiming'?this.localAim:undefined
+    this.match={...previous,...structuredClone(frame.state),terrain:structuredClone(terrain),pointerId:previous.pointerId}
+    if(ownAim){this.match.players[this.onlineSlot].aimAngle=ownAim.angle;this.match.players[this.onlineSlot].power=ownAim.power}
+    else this.localAim=undefined
+    if(previous.phase!==this.match.phase||previous.active!==this.match.active)this.clearInputs()
+    this.onlinePaused=frame.paused
+    this.networkPlayers=this.match.players.map(p=>({x:p.x,y:p.y}))
+    if(!fresh&&!initial)this.match.players.forEach((p,i)=>{p.x=previous.players[i].x;p.y=previous.players[i].y})
+    this.shotSpell=SPELLS[frame.spell]
+    const byId=new Map(this.onlineMissileIds.map((id,i)=>[id,{shot:this.volleyShots[i],sprite:this.volleyMissiles[i]}]))
+    for(const [id,item]of byId)if(!frame.shots.some(s=>s.id===id))item.sprite?.destroy()
+    const texture=MISSILE_TEXTURES[this.shotSpell.effect]
+    this.volleyMissiles=frame.shots.map(({id,shot})=>byId.get(id)?.sprite??this.add.sprite(shot.x,shot.y,texture).setDisplaySize(this.shotSpell.effect==='ice'?38:this.shotSpell.effect==='fire'?72:84,this.shotSpell.effect==='ice'?19:this.shotSpell.effect==='fire'?36:42).setDepth(5).play(`${texture}-travel`))
+    this.volleyShots=frame.shots.map(({id,shot})=>({...shot,x:byId.get(id)?.shot?.x??shot.x,y:byId.get(id)?.shot?.y??shot.y}))
+    this.onlineMissileIds=frame.shots.map(s=>s.id);this.networkTargets=frame.shots
+    this.match.shot=this.volleyShots[0]
+    if(fresh||initial){this.onlineEvent=frame.events.at(-1)?.id??0;this.polish?.clear(this.match.players);this.revision=-1;this.generateCrystals();this.resizeView()}
+    else for(const event of frame.events){
+      if(event.id<=this.onlineEvent)continue
+      this.onlineEvent=event.id
+      const p=this.match.players[event.player],spell=SPELLS[event.spell]
+      if(event.kind==='shot'){
+        this.trail=[]
+        window.dispatchEvent(new CustomEvent('alien-war-shot',{detail:{pan:p.x/WORLD_WIDTH*2-1}}))
+        this.recoil.set(p.id,{time:this.elapsed,angle:p.aimAngle,power:p.power})
+        this.polish?.muzzle(p.x+Math.cos(p.aimAngle)*43.5,p.y+4+Math.sin(p.aimAngle)*43.5,p.aimAngle,spell.effect)
+      }else if(event.kind==='impact'){
+        this.impact(event.x!,spell,event.target!);this.polish?.observe(this.match.players,spell.effect)
+        if(spell.destroyTerrain)this.polish?.debris(event.x!,surfaceAt(this.match.terrain,event.x!))
+      }else if(event.kind==='support'){
+        this.polish?.support(event.player,event.choice!)
+        if(event.choice==='heal'){
+          const text=this.add.text(p.x,p.y-50,`+${event.amount??20}`,{fontSize:'24px',color:'#a4ff9a'}).setOrigin(.5).setDepth(20)
+          this.animateEffect(text,{y:p.y-90,alpha:0,duration:900})
+        }
+      }else {this.poisonTick(event.player,event.kind==='burn');if(event.kind==='poison')this.polish?.poison(event.player)}
+    }
+    if(frame.state.phase==='MovementAiming'&&frame.state.active!==this.onlineSlot)this.selectedSpell=frame.spell
+  }
   mode:GameMode='local'
   difficulty:Difficulty='normal'
   private ai=new AiController()
@@ -36,7 +98,7 @@ export class LandscapeScene extends Phaser.Scene {
   get isComputerTurn(){return computerTurn(this.mode,this.match.active)}
   orientationBlocked=false
   setOrientationBlocked(blocked:boolean){this.orientationBlocked=blocked;if(blocked)this.clearInputs()}
-  get humanReady(){return !this.orientationBlocked&&this.gameplayEnabled&&!this.isComputerTurn&&this.match.phase==='MovementAiming'}
+  get humanReady(){return !this.orientationBlocked&&this.gameplayEnabled&&!this.isComputerTurn&&this.match.phase==='MovementAiming'&&(!this.online||this.onlineConnected&&!this.onlinePaused&&this.onlineSlot===this.match.active)}
   configure(mode:GameMode,difficulty:Difficulty){this.mode=mode;this.difficulty=difficulty;this.match.humanPlayerId=mode==='ai'?0:undefined;this.ai.reset()}
   gameplayEnabled=false
   shipKinds=[0,1,2,3]
@@ -162,7 +224,7 @@ export class LandscapeScene extends Phaser.Scene {
     }
   }
   private keyUp=(event:KeyboardEvent)=>{this.keys.delete(event.code)}
-  private clearInputs=()=>{this.held.clear();this.keys.clear();this.match.pointerId=undefined;this.lastAimTime=-Infinity}
+  private clearInputs=()=>{if(this.online&&this.onlineSlot===this.match.active&&this.match.phase==='MovementAiming'){const p=this.match.players[this.match.active];this.online.send({kind:'input',axis:0,angle:p.aimAngle,power:p.power,spell:this.selectedSpell})}this.held.clear();this.keys.clear();this.match.pointerId=undefined;this.lastAimTime=-Infinity}
   setGameplayEnabled(enabled:boolean){
     this.gameplayEnabled=enabled
     if(!enabled)this.clearInputs()
@@ -170,6 +232,7 @@ export class LandscapeScene extends Phaser.Scene {
   cast(){if(this.humanReady)this.fireWeapon()}
   support(choice:SupportChoice){
     if(this.orientationBlocked||!this.gameplayEnabled||(!this.humanReady&&!this.isComputerTurn))return false
+    if(this.online){if(!this.humanReady)return false;this.online.send({kind:'support',choice});return true}
     const amount=useSupport(this.match,choice)
     if(!amount)return false
     const player=this.match.players[this.match.active],pose=shipPose(this.match.terrain,player,this.elapsed,this.reducedMotion)
@@ -182,6 +245,7 @@ export class LandscapeScene extends Phaser.Scene {
   }
   private fireWeapon(){
     if(!this.gameplayEnabled||this.orientationBlocked)return
+    if(this.online){const p=this.match.players[this.match.active];this.online.send({kind:'fire',angle:p.aimAngle,power:p.power,spell:this.selectedSpell});this.clearInputs();return}
     if(!fire(this.match))return
     const shooter=this.match.players[this.match.active]
     window.dispatchEvent(new CustomEvent('alien-war-shot',{detail:{pan:shooter.x/WORLD_WIDTH*2-1}}))
@@ -196,6 +260,7 @@ export class LandscapeScene extends Phaser.Scene {
     this.polish?.muzzle(shooter.x+Math.cos(shooter.aimAngle)*43.5,muzzlePose.y+4+Math.sin(shooter.aimAngle)*43.5,shooter.aimAngle,this.shotSpell.effect)
   }
   restart(count=this.match.players.length){
+    this.onlineMissileIds=[];this.networkTargets=[];this.networkPlayers=[]
     this.ai.reset();this.audioTurn=-1;this.audioOutcome=false;this.resultDelay=0
     this.terrainFire?.clear();this.cryo?.clear()
     const variant=nextTerrainVariant(this.terrainVariants.get(count))
@@ -322,7 +387,27 @@ export class LandscapeScene extends Phaser.Scene {
     const right=(!editing&&(this.keys.has('KeyD')||this.keys.has('ArrowRight')))||[...this.held.values()].includes(1)
     const axis=this.isComputerTurn?aiAction.axis:this.match.pointerId!==undefined||left===right?0:left?-1:1
     const beforePhase=this.match.phase
-    while(this.stepAccumulator>=STEP_SECONDS){
+    if(this.online){
+      this.inputElapsed+=Math.min(delta,100)/1000
+      if(this.humanReady){
+        const p=this.match.players[this.match.active]
+        this.localAim={angle:p.aimAngle,power:p.power}
+      }
+      if(this.inputElapsed>=.1){
+        this.inputElapsed=0
+        if(this.onlineConnected&&this.onlineSlot===this.match.active&&this.match.phase==='MovementAiming'){
+          const p=this.match.players[this.match.active]
+          this.online.send({kind:'input',axis:this.humanReady?axis:0,angle:p.aimAngle,power:p.power,spell:this.selectedSpell})
+        }
+      }
+      const blend=1-Math.exp(-Math.min(delta,100)/45)
+      this.match.players.forEach((p,i)=>{const target=this.networkPlayers[i];if(target){p.x+=(target.x-p.x)*blend;p.y+=(target.y-p.y)*blend}})
+      this.volleyShots.forEach((shot,i)=>{const target=this.networkTargets[i]?.shot;if(target){shot.x+=(target.x-shot.x)*blend;shot.y+=(target.y-shot.y)*blend}})
+      this.match.shot=this.volleyShots[0]
+      this.match.cameraX=overviewScrollX(this.match.players,this.match.cameraZoom,this.match.viewWidth)
+      this.stepAccumulator=0
+    }
+    while(!this.online&&this.stepAccumulator>=STEP_SECONDS){
       if(this.match.phase==='ProjectileFlight'&&this.volleyShots.length){
         for(let i=this.volleyShots.length-1;i>=0;i--){
           const result=stepShot(this.volleyShots[i],this.match.terrain,this.match.players,STEP_SECONDS*PROJECTILE_SPEED_MULTIPLIER)

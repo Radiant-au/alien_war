@@ -1,4 +1,4 @@
-export type MenuView='main'|'setup'|'pause'|'battle'|'result'
+export type MenuView='main'|'setup'|'online'|'pause'|'battle'|'result'
 /** Navigation state is separate from the running match and saved configuration. */
 export class MenuNavigation {
   view:MenuView='main'

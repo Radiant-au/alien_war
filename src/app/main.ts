@@ -1,3 +1,5 @@
+import type { Frame } from '../../shared/protocol.ts'
+import type { OnlineClient } from '../network/client.ts'
 import { needsLandscape } from '../rendering/viewport.ts'
 import { supportReady, supportCountdown } from '../game/match.ts'
 import type { GameMode, Difficulty } from '../game/ai.ts'
@@ -71,8 +73,8 @@ document.querySelector('#aim-wheel')!.addEventListener('keydown',event=>{
 })
 for(const choice of ['heal','shield'] as const)document.querySelector(`#support-${choice}`)!.addEventListener('click',()=>{resetWheel();scene.support(choice)})
 document.querySelector('#fire')!.addEventListener('click',()=>scene.cast())
-document.querySelector('#restart')!.addEventListener('click',()=>{resetWheel();scene.restart()})
-document.querySelector('#player-count')!.addEventListener('change',e=>{resetWheel();scene.restart(Number((e.target as HTMLSelectElement).value))})
+document.querySelector('#restart')!.addEventListener('click',()=>{resetWheel();if(!scene.online)scene.restart()})
+document.querySelector('#player-count')!.addEventListener('change',e=>{resetWheel();if(!scene.online)scene.restart(Number((e.target as HTMLSelectElement).value))})
 document.querySelector('#fullscreen')!.addEventListener('click',async()=>{
   try{if(document.fullscreenElement)await document.exitFullscreen();else await app.requestFullscreen()}catch{document.querySelector('#turn-status')!.textContent='Fullscreen unavailable'}
 })
@@ -84,8 +86,9 @@ window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!(e.target
 const displayedHealth=SHIPS.map(()=>100)
 let healthAnimationTime=performance.now()
 let displayedMatch=scene.match
+let displayedOnlineId=''
 scene.setHud(({match,spell,aimFeedback})=>{
-  if(match!==displayedMatch){displayedMatch=match;displayedHealth.fill(100)}
+  if(scene.online){const id=scene.online.frame?.matchId??'';if(id!==displayedOnlineId){displayedOnlineId=id;displayedHealth.fill(100)}}else if(match!==displayedMatch){displayedMatch=match;displayedOnlineId='';displayedHealth.fill(100)}
   const now=performance.now(),healthTicks=now-healthAnimationTime>=24?1:0
   if(healthTicks)healthAnimationTime=now
   const ready=scene.humanReady,player=match.players[match.active]
@@ -125,7 +128,7 @@ scene.setHud(({match,spell,aimFeedback})=>{
     const ship=SHIPS[scene.shipKinds[i]]
     card.style.setProperty('--ship-color','#'+ship.color.toString(16))
     card.querySelector('.player-name')!.setAttribute('title',ship.name)
-    card.querySelector('.player-name')!.textContent=scene.mode==='ai'&&i>0?`AI${i}`:`P${i+1}`
+    card.querySelector('.player-name')!.textContent=scene.online?scene.onlineNames[i]??`P${i+1}`:scene.mode==='ai'&&i>0?`AI${i}`:`P${i+1}`
     const p=match.players[i];card.hidden=!p
     if(!p)return
     if(p.health>displayedHealth[i]&&healthTicks)displayedHealth[i]=Math.min(p.health,displayedHealth[i]+2)
@@ -147,7 +150,7 @@ scene.setHud(({match,spell,aimFeedback})=>{
   document.querySelector<HTMLElement>('.movement-controls')!.style.setProperty('--fuel-color','#'+SHIPS[scene.shipKinds[player.id]].color.toString(16))
   const winner=match.outcome?.match(/^Player (\d+) wins$/)
   const result=winner?`${scene.mode==='ai'&&Number(winner[1])>1?'Computer · ':''}${SHIPS[scene.shipKinds[Number(winner[1])-1]].name} wins!`:match.outcome
-  document.querySelector('#turn-status')!.textContent=result??(ready?`P${player.id+1} · ${SHIPS[scene.shipKinds[player.id]].name}'s turn` : match.phase==='MovementAiming'&&scene.isComputerTurn?`AI${player.id} · ${scene.difficulty} · thinking…`:match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
+  document.querySelector('#turn-status')!.textContent=scene.online?(result??(!scene.online.connected?'Connection lost · reconnecting…':scene.onlinePaused?'Waiting for a player to reconnect…':match.phase==='MovementAiming'?`${scene.onlineNames[player.id]??'Player '+(player.id+1)}’s turn${ready?' · YOUR TURN':''}`:match.phase==='ProjectileFlight'?'Weapon in flight':'Preparing next turn')):result??(ready?`P${player.id+1} · ${SHIPS[scene.shipKinds[player.id]].name}'s turn` : match.phase==='MovementAiming'&&scene.isComputerTurn?`AI${player.id} · ${scene.difficulty} · thinking…`:match.phase==='ProjectileFlight'?'Weapon in flight':match.phase==='Settling'?'Ships settling':'Preparing next turn')
   document.querySelector<HTMLButtonElement>('#fire')!.disabled=!ready||!player.grounded||player.health===0||match.pointerId!==undefined
   for(const id of ['move-left','move-right'])document.querySelector<HTMLButtonElement>(`#${id}`)!.disabled=!ready||player.movementRemaining<=0
 })
@@ -155,6 +158,8 @@ scene.setHud(({match,spell,aimFeedback})=>{
 
 export function startMatch(ship:number,count:number,mode:GameMode='local',difficulty:Difficulty='normal'){
   resetWheel()
+  scene.disconnectOnline()
+  setOnlineUtilities(false)
   scene.configure(mode,difficulty)
   document.querySelector('#battle-mode')!.textContent=mode==='ai'?'VS AI':'LOCAL'
   for(const option of document.querySelector<HTMLSelectElement>('#player-count')!.options){
@@ -189,3 +194,22 @@ new ResizeObserver(syncOrientation).observe(app)
 new MutationObserver(syncOrientation).observe(app,{attributes:true,attributeFilter:['inert']})
 touchQuery.addEventListener('change',syncOrientation)
 syncOrientation()
+
+function setOnlineUtilities(online:boolean){
+  document.querySelector<HTMLSelectElement>('#player-count')!.hidden=online
+  document.querySelector<HTMLButtonElement>('#restart')!.hidden=online
+}
+export function startOnlineMatch(frame:Frame,client:OnlineClient){
+  resetWheel()
+  const room=client.lobby!,member=room.members.find(p=>p.id===client.memberId)!
+  scene.connectOnline(client,member.slot)
+  scene.onlineNames=Object.fromEntries(room.members.map(p=>[p.slot,p.name]))
+  scene.shipKinds=Array.from({length:SHIPS.length},(_,i)=>room.members.find(p=>p.slot===i)?.ship??i)
+  document.querySelector('#battle-mode')!.textContent='ONLINE'
+  setOnlineUtilities(true)
+  scene.receiveOnlineFrame(frame,true)
+  scene.setGameplayEnabled(true)
+  if(scene.sys.isPaused())scene.scene.resume()
+  syncOrientation()
+  return scene
+}

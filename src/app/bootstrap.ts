@@ -1,3 +1,4 @@
+import { mountOnline } from '../network/lobby.ts'
 import '../styles/menu.css'
 import '../styles/scenery.css'
 import { SHIPS } from '../rendering/ships.ts'
@@ -31,6 +32,17 @@ menu.id = 'main-menu-screen'
 menu.setAttribute('aria-label', 'Alien War main menu')
 menu.innerHTML = menuMarkup(menuBackgroundUrl,menuHeroUrl,menuLogoUrl,SHIP_ART)
 document.body.append(menu)
+const online=mountOnline(menu,{
+  open(){engine?.pauseMatch();navigation.view='online';renderNavigation()},
+  async battle(frame,client){
+    engine??=await withDeadline(import('./main.ts'),30000)
+    await engine.gameReady;engineReady=true
+    const scene=engine.startOnlineMatch(frame,client)
+    navigation.hasMatch=true;navigation.view='battle';renderNavigation();engine.resumeMatch()
+    return scene
+  },
+  main(){showMain()},
+})
 const get = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 const options = get<HTMLDialogElement>('#audio-options')
 const exitDialog = get<HTMLDialogElement>('#exit-dialog')
@@ -64,21 +76,25 @@ function updateAudio() {
 function renderNavigation() {
   const view=navigation.view,visible=view!=='battle'
   menu.dataset.view=view;menu.hidden=!visible;menu.inert=false
-  for(const name of ['main','setup','pause','result'])get(`#${name}-view`).hidden=view!==name
+  for(const name of ['main','setup','online','pause','result'])get(`#${name}-view`).hidden=view!==name
   app.inert=visible;app.setAttribute('aria-hidden',String(visible))
-  if(visible){audio.setScene('menu');get(view==='result'?'#play-again':view==='setup'?'#setup-back':view==='pause'?'#resume-game':'#new-game').focus()}
+  if(visible){audio.setScene('menu');get(view==='online'?'#online-back':view==='result'?'#play-again':view==='setup'?'#setup-back':view==='pause'?'#resume-game':'#new-game').focus()}
   else{audio.setScene('battle');get<HTMLButtonElement>('#main-menu')?.focus()}
 }
 function showMain(){
+  if(online.client.lobby)void online.leave()
   engine?.pauseMatch();navigation.main();renderNavigation()
 }
 function showSetup(){
+  if(online.client.lobby)void online.leave()
   if(opening||starting)return
   engine?.pauseMatch();audio.unlock();audio.click();navigation.setup();updateSelection();renderNavigation()
 }
 function showPause(){
   if(navigation.view!=='battle')return
   if(!engineReady||!navigation.hasMatch||starting||opening)return
+  get('#pause-title').textContent=online.client.lobby?'MATCH MENU':'PAUSED'
+  get('#pause-new-game').querySelector('span')!.textContent=online.client.lobby?'LEAVE & NEW GAME':'NEW GAME'
   engine?.pauseMatch();navigation.pause();renderNavigation()
 }
 function resumeGame(){
@@ -133,6 +149,7 @@ async function newGame() {
     overlay.setAttribute('aria-busy','false')
   } finally { starting = false; menu.inert = false }
 }
+get('#open-online').addEventListener('click',()=>{audio.unlock();audio.click();online.open()})
 get('#new-game').addEventListener('click',showSetup)
 get('#pause-new-game').addEventListener('click',showSetup)
 get('#setup-back').addEventListener('click',()=>{audio.click();navigation.back();renderNavigation()})
@@ -175,13 +192,16 @@ window.addEventListener('alien-war-victory',event=>{
   navigation.finish();engine.pauseMatch()
   const winner=detail?.winner as number|undefined
   const defeated=detail?.outcome==='Defeat'
-  get('#result-title').textContent=defeated?'DEFEAT':winner===undefined?'DRAW!':`${detail.mode==='ai'&&winner>0?'COMPUTER '+winner:'PLAYER '+(winner+1)} WINS!`
+  const onlineWinner=online.client.lobby?.members.find(p=>p.slot===winner)?.name
+  get('#result-title').textContent=onlineWinner?`${onlineWinner.toUpperCase()} WINS!`:defeated?'DEFEAT':winner===undefined?'DRAW!':`${detail.mode==='ai'&&winner>0?'COMPUTER '+winner:'PLAYER '+(winner+1)} WINS!`
   const ship=winner===undefined?undefined:detail.shipKinds[winner]
   get('#result-ship').innerHTML=ship===undefined?'✦':`<img src="${SHIP_ART[ship]}" alt="">`
+  get('#play-again').querySelector('span:last-child')!.textContent=online.client.lobby?'RETURN TO LOBBY':'PLAY AGAIN'
   get('#result-caption').textContent=defeated?'Your ship was eliminated. Ready for a rematch?':winner===undefined?'An evenly matched battle':'Nice shot, Commander'
   renderNavigation()
 })
 get('#play-again').addEventListener('click',()=>{
+  if(online.client.lobby){void online.returnToLobby();return}
   if(!engine||!navigation.replay())return
   audio.unlock();audio.click();engine.scene.restart();renderNavigation();engine.resumeMatch()
 })
@@ -254,7 +274,7 @@ async function loadOpening(){
     opening=false;audio.setScene('menu');audio.finishLoading()
     overlay.hidden=true;overlay.setAttribute('aria-busy','false')
     get('#loading-music').hidden=true
-    menu.inert=false;showMain()
+    menu.inert=false;showMain();if(online.hasInvite||sessionStorage.getItem('alien-online-session'))online.open()
   } catch(error) {
     failed=true
     window.cancelAnimationFrame(progressFrame)
